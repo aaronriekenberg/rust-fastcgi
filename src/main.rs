@@ -1,10 +1,6 @@
-use std::{collections::HashMap, io::Read, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-//use async_trait::async_trait;
-use tokio::{
-    net::{tcp::OwnedWriteHalf, TcpListener},
-    sync::RwLock,
-};
+use tokio::net::{unix::OwnedWriteHalf, UnixListener};
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
 /// Define some response codes to use.
@@ -12,64 +8,71 @@ use tokio_fastcgi::{Request, RequestResult, Requests};
 struct HttpResponse {
     code: u16,
     message: &'static str,
+    data: Option<String>,
+    headers: HashMap<String, String>,
 }
 
 impl HttpResponse {
-    fn ok() -> Self {
+    fn ok(data: Option<String>, headers: HashMap<String, String>) -> Self {
         Self {
             code: 200,
             message: "Ok",
+            data,
+            headers,
+        }
+    }
+
+    fn error(code: u16, message: &'static str) -> Self {
+        Self {
+            code,
+            message,
+            data: None,
+            headers: HashMap::new(),
         }
     }
 
     fn e400() -> Self {
-        Self {
-            code: 400,
-            message: "Bad Request",
-        }
+        Self::error(400, "Bad Request")
     }
 
     fn e404() -> Self {
-        Self {
-            code: 404,
-            message: "Not Found",
-        }
+        Self::error(404, "Not Found")
     }
 
     fn e405() -> Self {
-        Self {
-            code: 405,
-            message: "Method Not Allowed",
-        }
+        Self::error(405, "Method Not Allowed")
     }
 
     fn e500() -> Self {
-        Self {
-            code: 500,
-            message: "Internal Server Error",
-        }
+        Self::error(500, "Internal Server Error")
     }
 }
 
 /// Encodes the HTTP status code and the response string and sends it back to the webserver.
 async fn send_response(
     request: Arc<Request<OwnedWriteHalf>>,
-    response_code: HttpResponse,
-    data: Option<&str>,
+    response: HttpResponse,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
-    println!("send_response response_code = {:?}", response_code);
-    request
-        .get_stdout()
-        .write(
-            format!(
-                "Status: {} {}\n\n",
-                response_code.code, response_code.message
-            )
-            .as_bytes(),
-        )
+    println!("send_response response = {:?}", response);
+
+    let mut stdout = request.get_stdout();
+
+    stdout
+        .write(format!("Status: {} {}\n", response.code, response.message).as_bytes())
         .await?;
-    if let Some(data) = data {
-        request.get_stdout().write(data.as_bytes()).await?;
+
+    if response.headers.len() > 0 {
+        for (key, value) in &response.headers {
+            stdout
+                .write(format!("{}: {}\n", key, value).as_bytes())
+                .await?;
+        }
+    }
+
+    stdout.write("\n".as_bytes()).await?;
+
+    if let Some(data) = response.data {
+        stdout.write(data.as_bytes()).await?;
     }
 
     Ok(RequestResult::Complete(0))
@@ -102,22 +105,35 @@ async fn process_request(
 
             // Process /cgi-bin/test
             (Some(""), Some("cgi-bin"), Some("test"), None) => {
-                send_response(request, HttpResponse::ok(), Some("hello world!")).await
+                let data = Some("hello world!".to_string());
+
+                let mut headers: HashMap<String, String> = HashMap::new();
+                headers.insert("Content-Type".to_string(), "text/things".to_string());
+
+                send_response(request, HttpResponse::ok(data, headers)).await
             }
 
             // Verything else will return HTTP 404 (Not Found)
-            _ => send_response(request, HttpResponse::e404(), None).await,
+            _ => send_response(request, HttpResponse::e404()).await,
         }
     } else {
-        send_response(request, HttpResponse::e400(), None).await
+        send_response(request, HttpResponse::e400()).await
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let addr = "127.0.0.1:8080";
-    let listener = TcpListener::bind(addr).await.unwrap();
-    println!("listening on {}", listener.local_addr().unwrap());
+    // let addr = "127.0.0.1:8080";
+    // let listener = TcpListener::bind(addr).await.unwrap();
+
+    let path = "/Users/aaron/rust-fastcgi/socket";
+
+    let remove_result = tokio::fs::remove_file(path).await;
+    println!("remove_result = {:?}", remove_result);
+
+    let listener = UnixListener::bind(path).unwrap();
+
+    println!("listening on {:?}", listener.local_addr().unwrap());
 
     loop {
         let connection = listener.accept().await;
@@ -128,7 +144,7 @@ async fn main() {
                 break;
             }
             Ok((stream, address)) => {
-                println!("Connection from {}", address);
+                println!("Connection from {:?}", address);
 
                 // If the socket connection was established successfully spawn a new task to handle
                 // the requests that the webserver will send us.
