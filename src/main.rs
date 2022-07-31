@@ -1,77 +1,41 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use tokio::net::{unix::OwnedWriteHalf, UnixListener};
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
-/// Define some response codes to use.
-#[derive(Debug)]
-struct HttpResponse {
-    code: u16,
-    message: &'static str,
-    data: Option<String>,
-    headers: HashMap<String, String>,
-}
-
-impl HttpResponse {
-    fn ok(data: Option<String>, headers: HashMap<String, String>) -> Self {
-        Self {
-            code: 200,
-            message: "Ok",
-            data,
-            headers,
-        }
-    }
-
-    fn error(code: u16, message: &'static str) -> Self {
-        Self {
-            code,
-            message,
-            data: None,
-            headers: HashMap::new(),
-        }
-    }
-
-    fn e400() -> Self {
-        Self::error(400, "Bad Request")
-    }
-
-    fn e404() -> Self {
-        Self::error(404, "Not Found")
-    }
-
-    fn e405() -> Self {
-        Self::error(405, "Method Not Allowed")
-    }
-
-    fn e500() -> Self {
-        Self::error(500, "Internal Server Error")
-    }
-}
+use http::{Response, StatusCode};
 
 /// Encodes the HTTP status code and the response string and sends it back to the webserver.
 async fn send_response(
     request: Arc<Request<OwnedWriteHalf>>,
-    response: HttpResponse,
+    response: http::Response<Option<String>>,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
     println!("send_response response = {:?}", response);
 
     let mut stdout = request.get_stdout();
 
     stdout
-        .write(format!("Status: {} {}\n", response.code, response.message).as_bytes())
+        .write(
+            format!(
+                "Status: {} {}\n",
+                response.status().as_u16(),
+                response.status().canonical_reason().unwrap()
+            )
+            .as_bytes(),
+        )
         .await?;
 
-    if response.headers.len() > 0 {
-        for (key, value) in &response.headers {
+    if response.headers().len() > 0 {
+        for (key, value) in response.headers() {
             stdout
-                .write(format!("{}: {}\n", key, value).as_bytes())
+                .write(format!("{}: {}\n", key.as_str(), value.to_str().unwrap()).as_bytes())
                 .await?;
         }
     }
 
     stdout.write("\n".as_bytes()).await?;
 
-    if let Some(data) = response.data {
+    if let Some(data) = response.body() {
         stdout.write(data.as_bytes()).await?;
     }
 
@@ -105,19 +69,36 @@ async fn process_request(
 
             // Process /cgi-bin/test
             (Some(""), Some("cgi-bin"), Some("test"), None) => {
-                let data = Some("hello world!".to_string());
+                let response = Response::builder()
+                    .header(http::header::CONTENT_TYPE, "text/test")
+                    .status(StatusCode::OK)
+                    .body(Some("hello world!".to_string()))
+                    .unwrap();
 
-                let mut headers: HashMap<String, String> = HashMap::new();
-                headers.insert("Content-Type".to_string(), "text/things".to_string());
-
-                send_response(request, HttpResponse::ok(data, headers)).await
+                send_response(request, response).await
             }
 
-            // Verything else will return HTTP 404 (Not Found)
-            _ => send_response(request, HttpResponse::e404()).await,
+            // Everything else will return HTTP 404 (Not Found)
+            _ => {
+                send_response(
+                    request,
+                    Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(None)
+                        .unwrap(),
+                )
+                .await
+            }
         }
     } else {
-        send_response(request, HttpResponse::e400()).await
+        send_response(
+            request,
+            Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(None)
+                .unwrap(),
+        )
+        .await
     }
 }
 
