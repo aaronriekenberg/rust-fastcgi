@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use log::{debug, error, info, warn};
+
 use tokio::net::{unix::OwnedWriteHalf, UnixListener};
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
@@ -13,7 +15,7 @@ async fn send_response(
     request: Arc<Request<OwnedWriteHalf>>,
     response: http::Response<Option<String>>,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
-    println!("send_response response = {:?}", response);
+    debug!("send_response response = {:?}", response);
 
     let mut stdout = request.get_stdout();
 
@@ -76,8 +78,6 @@ async fn process_debug_request(
         for param in str_params {
             let value = param.1.unwrap_or("[Invalid UTF8]").to_string();
 
-            println!("param {}: {}", param.0, value);
-
             let lower_case_key = param.0.to_ascii_lowercase();
             if lower_case_key.starts_with("http_") {
                 let http_header_key = &lower_case_key[5..];
@@ -90,13 +90,11 @@ async fn process_debug_request(
         }
     }
 
-    println!("debug_response = {:?}", debug_response);
-
     let json_result = serde_json::to_string(&debug_response);
 
     match json_result {
         Err(e) => {
-            println!("json serialization error {}", e);
+            warn!("json serialization error {}", e);
 
             send_response(
                 request,
@@ -127,12 +125,9 @@ async fn process_request(
     // Check that a `request_uri` parameter was passed by the webserver. If this is not the case,
     // fail with a HTTP 400 (Bad Request) error code.
 
-    println!("request = {:?}", request);
     if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
         // Split the request URI into the different path componets.
         // The following match is used to extract and verify the path compontens.
-
-        println!("request_uri = '{}'", request_uri);
 
         if request_uri.starts_with("/cgi-bin/debug") {
             process_debug_request(request).await
@@ -160,28 +155,30 @@ async fn process_request(
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     // let addr = "127.0.0.1:8080";
     // let listener = TcpListener::bind(addr).await.unwrap();
 
     let path = "/Users/aaron/rust-fastcgi/socket";
 
     let remove_result = tokio::fs::remove_file(path).await;
-    println!("remove_result = {:?}", remove_result);
+    debug!("remove_result = {:?}", remove_result);
 
     let listener = UnixListener::bind(path).unwrap();
 
-    println!("listening on {:?}", listener.local_addr().unwrap());
+    info!("listening on {:?}", listener.local_addr().unwrap());
 
     loop {
         let connection = listener.accept().await;
         // Accept new connections
         match connection {
             Err(err) => {
-                println!("Establishing connection failed: {}", err);
+                error!("Establishing connection failed: {}", err);
                 break;
             }
             Ok((stream, address)) => {
-                println!("Connection from {:?}", address);
+                debug!("Connection from {:?}", address);
 
                 // If the socket connection was established successfully spawn a new task to handle
                 // the requests that the webserver will send us.
@@ -199,7 +196,7 @@ async fn main() {
                             .await
                         {
                             // This is the error handler that is called if the process call returns an error.
-                            println!("Processing request failed: {}", err);
+                            warn!("Processing request failed: {}", err);
                         }
                     }
                 });
