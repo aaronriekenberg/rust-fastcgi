@@ -1,9 +1,12 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use tokio::net::{unix::OwnedWriteHalf, UnixListener};
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
 use http::{Response, StatusCode};
+
+use serde::Serialize;
 
 /// Encodes the HTTP status code and the response string and sends it back to the webserver.
 async fn send_response(
@@ -19,7 +22,7 @@ async fn send_response(
             format!(
                 "Status: {} {}\n",
                 response.status().as_u16(),
-                response.status().canonical_reason().unwrap()
+                response.status().canonical_reason().unwrap_or("UNKNOWN")
             )
             .as_bytes(),
         )
@@ -28,7 +31,14 @@ async fn send_response(
     if response.headers().len() > 0 {
         for (key, value) in response.headers() {
             stdout
-                .write(format!("{}: {}\n", key.as_str(), value.to_str().unwrap()).as_bytes())
+                .write(
+                    format!(
+                        "{}: {}\n",
+                        key.as_str(),
+                        value.to_str().unwrap_or("UNKNOWN")
+                    )
+                    .as_bytes(),
+                )
                 .await?;
         }
     }
@@ -40,6 +50,75 @@ async fn send_response(
     }
 
     Ok(RequestResult::Complete(0))
+}
+
+#[derive(Debug, Serialize)]
+struct DebugResponse {
+    http_headers: BTreeMap<String, String>,
+    other_params: BTreeMap<String, String>,
+}
+
+impl DebugResponse {
+    fn new() -> Self {
+        Self {
+            http_headers: BTreeMap::new(),
+            other_params: BTreeMap::new(),
+        }
+    }
+}
+
+async fn process_debug_request(
+    request: Arc<Request<OwnedWriteHalf>>,
+) -> Result<RequestResult, tokio_fastcgi::Error> {
+    let mut debug_response = DebugResponse::new();
+
+    if let Some(str_params) = request.str_params_iter() {
+        for param in str_params {
+            let value = param.1.unwrap_or("[Invalid UTF8]").to_string();
+
+            println!("param {}: {}", param.0, value);
+
+            let lower_case_key = param.0.to_ascii_lowercase();
+            if lower_case_key.starts_with("http_") {
+                let http_header_key = &lower_case_key[5..];
+                debug_response
+                    .http_headers
+                    .insert(http_header_key.to_string(), value);
+            } else {
+                debug_response.other_params.insert(lower_case_key, value);
+            }
+        }
+    }
+
+    println!("debug_response = {:?}", debug_response);
+
+    let json_result = serde_json::to_string(&debug_response);
+
+    match json_result {
+        Err(e) => {
+            println!("json serialization error {}", e);
+
+            send_response(
+                request,
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(None)
+                    .unwrap(),
+            )
+            .await
+        }
+        Ok(json_string) => {
+            send_response(
+                request,
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .body(Some(json_string))
+                    .unwrap(),
+            )
+            .await
+        }
+    }
 }
 
 async fn process_request(
@@ -54,41 +133,18 @@ async fn process_request(
         // The following match is used to extract and verify the path compontens.
 
         println!("request_uri = '{}'", request_uri);
-        let mut request_parts = request_uri.split_terminator('/').fuse();
-        match (
-            request_parts.next(),
-            request_parts.next(),
-            request_parts.next(),
-            request_parts.next(),
-            // request_parts.next(),
-        ) {
-            // Process /api/<endpoint>[/<selector>]
-            // (Some(""), Some("api"), Some(endpoint), selector, None) => {
-            //     // process_endpoint(store, request, endpoint, selector).await
-            // }
 
-            // Process /cgi-bin/test
-            (Some(""), Some("cgi-bin"), Some("test"), None) => {
-                let response = Response::builder()
-                    .header(http::header::CONTENT_TYPE, "text/test")
-                    .status(StatusCode::OK)
-                    .body(Some("hello world!".to_string()))
-                    .unwrap();
-
-                send_response(request, response).await
-            }
-
-            // Everything else will return HTTP 404 (Not Found)
-            _ => {
-                send_response(
-                    request,
-                    Response::builder()
-                        .status(StatusCode::NOT_FOUND)
-                        .body(None)
-                        .unwrap(),
-                )
-                .await
-            }
+        if request_uri.starts_with("/cgi-bin/debug") {
+            process_debug_request(request).await
+        } else {
+            send_response(
+                request,
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(None)
+                    .unwrap(),
+            )
+            .await
         }
     } else {
         send_response(
