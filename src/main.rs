@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::sync::Arc;
 
 use log::{debug, error, info, warn};
@@ -17,39 +18,36 @@ async fn send_response(
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
     debug!("send_response response = {:?}", response);
 
-    let mut stdout = request.get_stdout();
+    let mut response_string = String::new();
 
-    stdout
-        .write(
-            format!(
-                "Status: {} {}\n",
-                response.status().as_u16(),
-                response.status().canonical_reason().unwrap_or("UNKNOWN")
-            )
-            .as_bytes(),
+    write!(
+        response_string,
+        "Status: {} {}\n",
+        response.status().as_u16(),
+        response.status().canonical_reason().unwrap_or("UNKNOWN")
+    )
+    .unwrap();
+
+    for (key, value) in response.headers() {
+        write!(
+            response_string,
+            "{}: {}\n",
+            key.as_str(),
+            value.to_str().unwrap_or("UNKNOWN")
         )
-        .await?;
-
-    if response.headers().len() > 0 {
-        for (key, value) in response.headers() {
-            stdout
-                .write(
-                    format!(
-                        "{}: {}\n",
-                        key.as_str(),
-                        value.to_str().unwrap_or("UNKNOWN")
-                    )
-                    .as_bytes(),
-                )
-                .await?;
-        }
+        .unwrap();
     }
 
-    stdout.write("\n".as_bytes()).await?;
+    response_string.push('\n');
 
     if let Some(data) = response.body() {
-        stdout.write(data.as_bytes()).await?;
+        response_string.push_str(data);
     }
+
+    request
+        .get_stdout()
+        .write(response_string.as_bytes())
+        .await?;
 
     Ok(RequestResult::Complete(0))
 }
