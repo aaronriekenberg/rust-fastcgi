@@ -5,6 +5,9 @@ use std::sync::Arc;
 use log::{debug, error, info, warn};
 
 use tokio::net::{unix::OwnedWriteHalf, UnixListener};
+
+use tokio::process::Command;
+
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
 use http::{Response, StatusCode};
@@ -108,6 +111,57 @@ async fn process_debug_request(
     }
 }
 
+#[derive(Debug, Default, Serialize)]
+struct CommandResponse {
+    command_output: String,
+}
+
+async fn process_command_request(
+    request: Arc<Request<OwnedWriteHalf>>,
+) -> Result<RequestResult, tokio_fastcgi::Error> {
+    let output: std::process::Output = Command::new("ls")
+        .arg("-latrh")
+        .output()
+        .await
+        .expect("ls command failed to run");
+
+    let mut combined_output = String::with_capacity(output.stderr.len() + output.stdout.len());
+    combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
+    combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
+
+    let command_response = CommandResponse {
+        command_output: combined_output,
+    };
+
+    let json_result = serde_json::to_string(&command_response);
+
+    match json_result {
+        Err(e) => {
+            warn!("json serialization error {}", e);
+
+            send_response(
+                request,
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(None)
+                    .unwrap(),
+            )
+            .await
+        }
+        Ok(json_string) => {
+            send_response(
+                request,
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .body(Some(json_string))
+                    .unwrap(),
+            )
+            .await
+        }
+    }
+}
+
 async fn process_request(
     request: Arc<Request<OwnedWriteHalf>>,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
@@ -120,6 +174,8 @@ async fn process_request(
 
         if request_uri.starts_with("/cgi-bin/debug") {
             process_debug_request(request).await
+        } else if request_uri.starts_with("/cgi-bin/commands/ls") {
+            process_command_request(request).await
         } else {
             send_response(
                 request,
