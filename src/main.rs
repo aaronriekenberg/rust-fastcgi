@@ -10,8 +10,6 @@ use tokio::process::Command;
 
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
-use http::{Response, StatusCode};
-
 use serde::Serialize;
 
 /// Encodes the HTTP status code and the response string and sends it back to the webserver.
@@ -55,6 +53,20 @@ async fn send_response(
     Ok(RequestResult::Complete(0))
 }
 
+async fn send_status_code_response(
+    request: Arc<Request<OwnedWriteHalf>>,
+    status_code: http::StatusCode,
+) -> Result<RequestResult, tokio_fastcgi::Error> {
+    send_response(
+        request,
+        http::Response::builder()
+            .status(status_code)
+            .body(None)
+            .unwrap(),
+    )
+    .await
+}
+
 async fn send_json_response(
     request: Arc<Request<OwnedWriteHalf>>,
     response_dto: impl Serialize,
@@ -65,20 +77,13 @@ async fn send_json_response(
         Err(e) => {
             warn!("json serialization error {}", e);
 
-            send_response(
-                request,
-                Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(None)
-                    .unwrap(),
-            )
-            .await
+            send_status_code_response(request, http::StatusCode::INTERNAL_SERVER_ERROR).await
         }
         Ok(json_string) => {
             send_response(
                 request,
-                Response::builder()
-                    .status(StatusCode::OK)
+                http::Response::builder()
+                    .status(http::StatusCode::OK)
                     .header(http::header::CONTENT_TYPE, "application/json")
                     .body(Some(json_string))
                     .unwrap(),
@@ -126,7 +131,7 @@ struct CommandResponse {
 async fn process_command_request(
     request: Arc<Request<OwnedWriteHalf>>,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
-    let command_result = Command::new("badls").arg("-latrh").output().await;
+    let command_result = Command::new("ls").arg("-latrh").output().await;
 
     let output = match command_result {
         Err(err) => {
@@ -164,24 +169,10 @@ async fn process_request(
         } else if request_uri.starts_with("/cgi-bin/commands/ls") {
             process_command_request(request).await
         } else {
-            send_response(
-                request,
-                Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(None)
-                    .unwrap(),
-            )
-            .await
+            send_status_code_response(request, http::StatusCode::NOT_FOUND).await
         }
     } else {
-        send_response(
-            request,
-            Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(None)
-                .unwrap(),
-        )
-        .await
+        send_status_code_response(request, http::StatusCode::BAD_REQUEST).await
     }
 }
 
