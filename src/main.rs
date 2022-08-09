@@ -14,13 +14,14 @@ use tokio_fastcgi::{Request, RequestResult, Requests};
 
 use serde::Serialize;
 
+type HttpResponse = http::Response<Option<String>>;
+
 #[async_trait]
 trait RequestHandler {
-    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>)
-        -> http::Response<Option<String>>;
+    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse;
 }
 
-fn build_json_response(response_dto: impl Serialize) -> http::Response<Option<String>> {
+fn build_json_response(response_dto: impl Serialize) -> HttpResponse {
     let json_result = serde_json::to_string(&response_dto);
 
     match json_result {
@@ -40,7 +41,7 @@ fn build_json_response(response_dto: impl Serialize) -> http::Response<Option<St
     }
 }
 
-fn build_status_code_response(status_code: http::StatusCode) -> http::Response<Option<String>> {
+fn build_status_code_response(status_code: http::StatusCode) -> HttpResponse {
     http::Response::builder()
         .status(status_code)
         .body(None)
@@ -57,10 +58,7 @@ struct DebugHandler {}
 
 #[async_trait]
 impl RequestHandler for DebugHandler {
-    async fn handle(
-        &self,
-        request: Arc<Request<OwnedWriteHalf>>,
-    ) -> http::Response<Option<String>> {
+    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
         let mut debug_response = DebugResponse::default();
 
         if let Some(str_params) = request.str_params_iter() {
@@ -92,10 +90,7 @@ struct CommandHandler {}
 
 #[async_trait]
 impl RequestHandler for CommandHandler {
-    async fn handle(
-        &self,
-        _request: Arc<Request<OwnedWriteHalf>>,
-    ) -> http::Response<Option<String>> {
+    async fn handle(&self, _request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
         let command_result = Command::new("ls").arg("-latrh").output().await;
 
         let output = match command_result {
@@ -136,10 +131,7 @@ impl Router {
 
 #[async_trait]
 impl RequestHandler for Router {
-    async fn handle(
-        &self,
-        request: Arc<Request<OwnedWriteHalf>>,
-    ) -> http::Response<Option<String>> {
+    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
         if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
             // Split the request URI into the different path componets.
             // The following match is used to extract and verify the path compontens.
@@ -160,7 +152,7 @@ impl RequestHandler for Router {
 /// Encodes the HTTP status code and the response string and sends it back to the webserver.
 async fn send_response(
     request: Arc<Request<OwnedWriteHalf>>,
-    response: http::Response<Option<String>>,
+    response: HttpResponse,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
     debug!("send_response response = {:?}", response);
 
