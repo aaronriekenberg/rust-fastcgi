@@ -55,6 +55,39 @@ async fn send_response(
     Ok(RequestResult::Complete(0))
 }
 
+async fn send_json_response(
+    request: Arc<Request<OwnedWriteHalf>>,
+    response_dto: impl Serialize,
+) -> Result<RequestResult, tokio_fastcgi::Error> {
+    let json_result = serde_json::to_string(&response_dto);
+
+    match json_result {
+        Err(e) => {
+            warn!("json serialization error {}", e);
+
+            send_response(
+                request,
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(None)
+                    .unwrap(),
+            )
+            .await
+        }
+        Ok(json_string) => {
+            send_response(
+                request,
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .body(Some(json_string))
+                    .unwrap(),
+            )
+            .await
+        }
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 struct DebugResponse {
     http_headers: BTreeMap<String, String>,
@@ -82,33 +115,7 @@ async fn process_debug_request(
         }
     }
 
-    let json_result = serde_json::to_string(&debug_response);
-
-    match json_result {
-        Err(e) => {
-            warn!("json serialization error {}", e);
-
-            send_response(
-                request,
-                Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(None)
-                    .unwrap(),
-            )
-            .await
-        }
-        Ok(json_string) => {
-            send_response(
-                request,
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header(http::header::CONTENT_TYPE, "application/json")
-                    .body(Some(json_string))
-                    .unwrap(),
-            )
-            .await
-        }
-    }
+    send_json_response(request, debug_response).await
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -133,33 +140,7 @@ async fn process_command_request(
         command_output: combined_output,
     };
 
-    let json_result = serde_json::to_string(&command_response);
-
-    match json_result {
-        Err(e) => {
-            warn!("json serialization error {}", e);
-
-            send_response(
-                request,
-                Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(None)
-                    .unwrap(),
-            )
-            .await
-        }
-        Ok(json_string) => {
-            send_response(
-                request,
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header(http::header::CONTENT_TYPE, "application/json")
-                    .body(Some(json_string))
-                    .unwrap(),
-            )
-            .await
-        }
-    }
+    send_json_response(request, command_response).await
 }
 
 async fn process_request(
