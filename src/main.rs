@@ -126,11 +126,17 @@ struct CommandResponse {
 async fn process_command_request(
     request: Arc<Request<OwnedWriteHalf>>,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
-    let output: std::process::Output = Command::new("ls")
-        .arg("-latrh")
-        .output()
-        .await
-        .expect("ls command failed to run");
+    let command_result = Command::new("badls").arg("-latrh").output().await;
+
+    let output = match command_result {
+        Err(err) => {
+            let command_response = CommandResponse {
+                command_output: format!("error running command {}", err),
+            };
+            return send_json_response(request, command_response).await;
+        }
+        Ok(output) => output,
+    };
 
     let mut combined_output = String::with_capacity(output.stderr.len() + output.stdout.len());
     combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
