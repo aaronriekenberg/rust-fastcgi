@@ -54,25 +54,16 @@ async fn send_response(
     Ok(RequestResult::Complete(0))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 struct DebugResponse {
     http_headers: BTreeMap<String, String>,
     other_params: BTreeMap<String, String>,
 }
 
-impl DebugResponse {
-    fn new() -> Self {
-        Self {
-            http_headers: BTreeMap::new(),
-            other_params: BTreeMap::new(),
-        }
-    }
-}
-
 async fn process_debug_request(
     request: Arc<Request<OwnedWriteHalf>>,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
-    let mut debug_response = DebugResponse::new();
+    let mut debug_response = DebugResponse::default();
 
     if let Some(str_params) = request.str_params_iter() {
         for param in str_params {
@@ -160,7 +151,7 @@ async fn main() {
     // let addr = "127.0.0.1:8080";
     // let listener = TcpListener::bind(addr).await.unwrap();
 
-    let path = "/Users/aaron/rust-fastcgi/socket";
+    let path = "./socket";
 
     let remove_result = tokio::fs::remove_file(path).await;
     debug!("remove_result = {:?}", remove_result);
