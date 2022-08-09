@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
-use std::fmt::Write;
+use std::fmt::{Debug, Write};
 use std::sync::Arc;
+
+use async_trait::async_trait;
 
 use log::{debug, error, info, warn};
 
@@ -11,6 +13,149 @@ use tokio::process::Command;
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
 use serde::Serialize;
+
+#[async_trait]
+trait RequestHandler {
+    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>)
+        -> http::Response<Option<String>>;
+}
+
+fn build_json_response(response_dto: impl Serialize) -> http::Response<Option<String>> {
+    let json_result = serde_json::to_string(&response_dto);
+
+    match json_result {
+        Err(e) => {
+            warn!("json serialization error {}", e);
+
+            http::Response::builder()
+                .status(http::StatusCode::INTERNAL_SERVER_ERROR)
+                .body(None)
+                .unwrap()
+        }
+        Ok(json_string) => http::Response::builder()
+            .status(http::StatusCode::OK)
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(Some(json_string))
+            .unwrap(),
+    }
+}
+
+fn build_status_code_response(status_code: http::StatusCode) -> http::Response<Option<String>> {
+    http::Response::builder()
+        .status(status_code)
+        .body(None)
+        .unwrap()
+}
+
+#[derive(Debug, Default, Serialize)]
+struct DebugResponse {
+    http_headers: BTreeMap<String, String>,
+    other_params: BTreeMap<String, String>,
+}
+
+struct DebugHandler {}
+
+#[async_trait]
+impl RequestHandler for DebugHandler {
+    async fn handle(
+        &self,
+        request: Arc<Request<OwnedWriteHalf>>,
+    ) -> http::Response<Option<String>> {
+        let mut debug_response = DebugResponse::default();
+
+        if let Some(str_params) = request.str_params_iter() {
+            for param in str_params {
+                let value = param.1.unwrap_or("[Invalid UTF8]").to_string();
+
+                let lower_case_key = param.0.to_ascii_lowercase();
+                if lower_case_key.starts_with("http_") {
+                    let http_header_key = &lower_case_key[5..];
+                    debug_response
+                        .http_headers
+                        .insert(http_header_key.to_string(), value);
+                } else {
+                    debug_response.other_params.insert(lower_case_key, value);
+                }
+            }
+        }
+
+        build_json_response(debug_response)
+    }
+}
+
+#[derive(Debug, Default, Serialize)]
+struct CommandResponse {
+    command_output: String,
+}
+
+struct CommandHandler {}
+
+#[async_trait]
+impl RequestHandler for CommandHandler {
+    async fn handle(
+        &self,
+        _request: Arc<Request<OwnedWriteHalf>>,
+    ) -> http::Response<Option<String>> {
+        let command_result = Command::new("ls").arg("-latrh").output().await;
+
+        let output = match command_result {
+            Err(err) => {
+                let command_response = CommandResponse {
+                    command_output: format!("error running command {}", err),
+                };
+                return build_json_response(command_response);
+            }
+            Ok(output) => output,
+        };
+
+        let mut combined_output = String::with_capacity(output.stderr.len() + output.stdout.len());
+        combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
+        combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
+
+        let command_response = CommandResponse {
+            command_output: combined_output,
+        };
+
+        build_json_response(command_response)
+    }
+}
+
+struct Router {
+    debug_handler: DebugHandler,
+    command_handler: CommandHandler,
+}
+
+impl Router {
+    fn new() -> Self {
+        Self {
+            debug_handler: DebugHandler {},
+            command_handler: CommandHandler {},
+        }
+    }
+}
+
+#[async_trait]
+impl RequestHandler for Router {
+    async fn handle(
+        &self,
+        request: Arc<Request<OwnedWriteHalf>>,
+    ) -> http::Response<Option<String>> {
+        if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
+            // Split the request URI into the different path componets.
+            // The following match is used to extract and verify the path compontens.
+
+            if request_uri.starts_with("/cgi-bin/debug") {
+                self.debug_handler.handle(request).await
+            } else if request_uri.starts_with("/cgi-bin/commands/ls") {
+                self.command_handler.handle(request).await
+            } else {
+                build_status_code_response(http::StatusCode::NOT_FOUND)
+            }
+        } else {
+            build_status_code_response(http::StatusCode::BAD_REQUEST)
+        }
+    }
+}
 
 /// Encodes the HTTP status code and the response string and sends it back to the webserver.
 async fn send_response(
@@ -53,129 +198,6 @@ async fn send_response(
     Ok(RequestResult::Complete(0))
 }
 
-async fn send_status_code_response(
-    request: Arc<Request<OwnedWriteHalf>>,
-    status_code: http::StatusCode,
-) -> Result<RequestResult, tokio_fastcgi::Error> {
-    send_response(
-        request,
-        http::Response::builder()
-            .status(status_code)
-            .body(None)
-            .unwrap(),
-    )
-    .await
-}
-
-async fn send_json_response(
-    request: Arc<Request<OwnedWriteHalf>>,
-    response_dto: impl Serialize,
-) -> Result<RequestResult, tokio_fastcgi::Error> {
-    let json_result = serde_json::to_string(&response_dto);
-
-    match json_result {
-        Err(e) => {
-            warn!("json serialization error {}", e);
-
-            send_status_code_response(request, http::StatusCode::INTERNAL_SERVER_ERROR).await
-        }
-        Ok(json_string) => {
-            send_response(
-                request,
-                http::Response::builder()
-                    .status(http::StatusCode::OK)
-                    .header(http::header::CONTENT_TYPE, "application/json")
-                    .body(Some(json_string))
-                    .unwrap(),
-            )
-            .await
-        }
-    }
-}
-
-#[derive(Debug, Default, Serialize)]
-struct DebugResponse {
-    http_headers: BTreeMap<String, String>,
-    other_params: BTreeMap<String, String>,
-}
-
-async fn process_debug_request(
-    request: Arc<Request<OwnedWriteHalf>>,
-) -> Result<RequestResult, tokio_fastcgi::Error> {
-    let mut debug_response = DebugResponse::default();
-
-    if let Some(str_params) = request.str_params_iter() {
-        for param in str_params {
-            let value = param.1.unwrap_or("[Invalid UTF8]").to_string();
-
-            let lower_case_key = param.0.to_ascii_lowercase();
-            if lower_case_key.starts_with("http_") {
-                let http_header_key = &lower_case_key[5..];
-                debug_response
-                    .http_headers
-                    .insert(http_header_key.to_string(), value);
-            } else {
-                debug_response.other_params.insert(lower_case_key, value);
-            }
-        }
-    }
-
-    send_json_response(request, debug_response).await
-}
-
-#[derive(Debug, Default, Serialize)]
-struct CommandResponse {
-    command_output: String,
-}
-
-async fn process_command_request(
-    request: Arc<Request<OwnedWriteHalf>>,
-) -> Result<RequestResult, tokio_fastcgi::Error> {
-    let command_result = Command::new("ls").arg("-latrh").output().await;
-
-    let output = match command_result {
-        Err(err) => {
-            let command_response = CommandResponse {
-                command_output: format!("error running command {}", err),
-            };
-            return send_json_response(request, command_response).await;
-        }
-        Ok(output) => output,
-    };
-
-    let mut combined_output = String::with_capacity(output.stderr.len() + output.stdout.len());
-    combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
-    combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
-
-    let command_response = CommandResponse {
-        command_output: combined_output,
-    };
-
-    send_json_response(request, command_response).await
-}
-
-async fn process_request(
-    request: Arc<Request<OwnedWriteHalf>>,
-) -> Result<RequestResult, tokio_fastcgi::Error> {
-    // Check that a `request_uri` parameter was passed by the webserver. If this is not the case,
-    // fail with a HTTP 400 (Bad Request) error code.
-
-    if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
-        // Split the request URI into the different path componets.
-        // The following match is used to extract and verify the path compontens.
-
-        if request_uri.starts_with("/cgi-bin/debug") {
-            process_debug_request(request).await
-        } else if request_uri.starts_with("/cgi-bin/commands/ls") {
-            process_command_request(request).await
-        } else {
-            send_status_code_response(request, http::StatusCode::NOT_FOUND).await
-        }
-    } else {
-        send_status_code_response(request, http::StatusCode::BAD_REQUEST).await
-    }
-}
-
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -192,6 +214,8 @@ async fn main() {
 
     info!("listening on {:?}", listener.local_addr().unwrap());
 
+    let router = Arc::new(Router::new());
+
     loop {
         let connection = listener.accept().await;
         // Accept new connections
@@ -203,6 +227,8 @@ async fn main() {
             Ok((stream, address)) => {
                 debug!("Connection from {:?}", address);
 
+                let conn_router = Arc::clone(&router);
+
                 // If the socket connection was established successfully spawn a new task to handle
                 // the requests that the webserver will send us.
                 tokio::spawn(async move {
@@ -212,10 +238,14 @@ async fn main() {
 
                     // Loop over the requests via the next method and process them.
                     while let Ok(Some(request)) = requests.next().await {
+                        let request_router = Arc::clone(&conn_router);
+
                         if let Err(err) = request
-                            .process(
-                                |request| async move { process_request(request).await.unwrap() },
-                            )
+                            .process(|request| async move {
+                                let response = request_router.handle(Arc::clone(&request)).await;
+
+                                send_response(request, response).await.unwrap()
+                            })
                             .await
                         {
                             // This is the error handler that is called if the process call returns an error.
