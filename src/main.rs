@@ -151,9 +151,7 @@ impl Router {
 #[async_trait]
 impl RequestHandler for Router {
     async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
-
         if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
-
             for route in &self.routes {
                 if route.matches(&request_uri) {
                     return route.request_handler.handle(request).await;
@@ -210,7 +208,7 @@ async fn send_response(
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    env_logger::builder().format_timestamp_nanos().init();
 
     // let addr = "127.0.0.1:8080";
     // let listener = TcpListener::bind(addr).await.unwrap();
