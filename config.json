@@ -1,0 +1,15 @@
+{
+    "server_info": {
+        "socket_path": "./socket"
+    },
+    "commands": [
+        {
+            "id": "ls",
+            "description": "ls",
+            "command": "/bin/ls",
+            "args": [
+                "-latrh"
+            ]
+        }
+    ]
+}

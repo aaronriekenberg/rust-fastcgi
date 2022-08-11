@@ -1,3 +1,5 @@
+mod config;
+
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Write};
 use std::sync::Arc;
@@ -207,13 +209,18 @@ async fn send_response(
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder().format_timestamp_nanos().init();
+
+    let configuration = config::read_configuration("config.json").await?;
+
+    let commands = configuration.commands();
+    info!("commands.len() = {}", commands.len());
 
     // let addr = "127.0.0.1:8080";
     // let listener = TcpListener::bind(addr).await.unwrap();
 
-    let path = "./socket";
+    let path = configuration.server_info().socket_path();
 
     let remove_result = tokio::fs::remove_file(path).await;
     debug!("remove_result = {:?}", remove_result);
@@ -264,4 +271,6 @@ async fn main() {
             }
         }
     }
+
+    Ok(())
 }
