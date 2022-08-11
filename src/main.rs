@@ -225,9 +225,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let remove_result = tokio::fs::remove_file(path).await;
     debug!("remove_result = {:?}", remove_result);
 
-    let listener = UnixListener::bind(path).unwrap();
+    let listener = UnixListener::bind(path)?;
 
-    info!("listening on {:?}", listener.local_addr().unwrap());
+    info!("listening on {:?}", listener.local_addr()?);
 
     let router = Arc::new(Router::new());
 
