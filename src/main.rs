@@ -17,7 +17,7 @@ use serde::Serialize;
 type HttpResponse = http::Response<Option<String>>;
 
 #[async_trait]
-trait RequestHandler {
+trait RequestHandler: Send + Sync {
     async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse;
 }
 
@@ -115,34 +115,52 @@ impl RequestHandler for CommandHandler {
     }
 }
 
+struct Route {
+    url_prefix: String,
+    request_handler: Box<dyn RequestHandler>,
+}
+
+impl Route {
+    fn matches(&self, request_uri: &str) -> bool {
+        request_uri.starts_with(&self.url_prefix)
+    }
+}
+
 struct Router {
-    debug_handler: DebugHandler,
-    command_handler: CommandHandler,
+    routes: Vec<Route>,
 }
 
 impl Router {
     fn new() -> Self {
-        Self {
-            debug_handler: DebugHandler {},
-            command_handler: CommandHandler {},
-        }
+        let mut routes = Vec::new();
+
+        routes.push(Route {
+            url_prefix: "/cgi-bin/debug".to_string(),
+            request_handler: Box::new(DebugHandler {}),
+        });
+
+        routes.push(Route {
+            url_prefix: "/cgi-bin/commands/ls".to_string(),
+            request_handler: Box::new(CommandHandler {}),
+        });
+
+        Self { routes }
     }
 }
 
 #[async_trait]
 impl RequestHandler for Router {
     async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
-        if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
-            // Split the request URI into the different path componets.
-            // The following match is used to extract and verify the path compontens.
 
-            if request_uri.starts_with("/cgi-bin/debug") {
-                self.debug_handler.handle(request).await
-            } else if request_uri.starts_with("/cgi-bin/commands/ls") {
-                self.command_handler.handle(request).await
-            } else {
-                build_status_code_response(http::StatusCode::NOT_FOUND)
+        if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
+
+            for route in &self.routes {
+                if route.matches(&request_uri) {
+                    return route.request_handler.handle(request).await;
+                }
             }
+
+            build_status_code_response(http::StatusCode::NOT_FOUND)
         } else {
             build_status_code_response(http::StatusCode::BAD_REQUEST)
         }
