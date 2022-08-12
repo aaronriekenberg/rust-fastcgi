@@ -1,24 +1,78 @@
 {
     "server_configuration": {
-        "socket_path": "./socket"
+        "socket_path": "/var/www/run/go-fastcgi/socket"
     },
     "command_configuration": {
         "commands": [
             {
-                "id": "ls",
-                "description": "ls",
-                "command": "/bin/ls",
+                "id": "chronyc_sources",
+                "description": "chronyc sources",
+                "command": "/usr/bin/chronyc",
                 "args": [
-                    "-latrh"
+                    "-n",
+                    "sources",
+                    "-a",
+                    "-v"
                 ]
             },
             {
-                "id": "uname",
-                "description": "uname",
-                "command": "/usr/bin/uname",
+                "id": "df",
+                "description": "df",
+                "command": "/usr/bin/df",
                 "args": [
-                    "-a"
+                    "-h"
                 ]
+            },
+            {
+                "id": "ip_addr",
+                "description": "ip addr",
+                "command": "/usr/sbin/ip",
+                "args": [
+                    "addr"
+                ]
+            },
+            {
+                "id": "lscpu",
+                "description": "lscpu",
+                "command": "/usr/bin/lscpu"
+            },
+            {
+                "id": "netstat_an",
+                "description": "netstat -an",
+                "command": "/usr/bin/netstat",
+                "args": [
+                    "-a",
+                    "-n"
+                ]
+            },
+            {
+                "id": "pitemp",
+                "description": "pitemp",
+                "command": "/home/aaron/repo/raspberrypi/pitemp.sh"
+            },
+            {
+                "id": "top",
+                "description": "top",
+                "command": "/usr/bin/top",
+                "args": [
+                    "-b",
+                    "-n1"
+                ]
+            },
+            {
+                "id": "uptime",
+                "description": "uptime",
+                "command": "/usr/bin/uptime"
+            },
+            {
+                "id": "vmstat",
+                "description": "vmstat",
+                "command": "/usr/bin/vmstat"
+            },
+            {
+                "id": "w",
+                "description": "w",
+                "command": "/usr/bin/w"
             }
         ]
     }

@@ -19,6 +19,7 @@ pub struct CommandInfo {
     id: String,
     description: String,
     command: String,
+    #[serde(default)]
     args: Vec<String>,
 }
 
