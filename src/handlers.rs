@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 
@@ -132,6 +133,7 @@ impl RequestHandler for AllCommandsHandler {
 #[derive(Debug, Serialize)]
 struct RunCommandResponse {
     now: String,
+    command_duration_ms: u128,
     command_info: crate::config::CommandInfo,
     command_output: String,
 }
@@ -149,15 +151,20 @@ impl RunCommandHandler {
 #[async_trait]
 impl RequestHandler for RunCommandHandler {
     async fn handle(&self, _request: FastCGIRequest) -> HttpResponse {
+        let command_start_time = Instant::now();
+
         let command_result = Command::new(self.command_info.command())
             .args(self.command_info.args())
             .output()
             .await;
 
+        let command_duration = Instant::now() - command_start_time;
+
         let output = match command_result {
             Err(err) => {
                 let response = RunCommandResponse {
                     now: current_time_string(),
+                    command_duration_ms: 0,
                     command_info: self.command_info.clone(),
                     command_output: format!("error running command {}", err),
                 };
@@ -172,6 +179,7 @@ impl RequestHandler for RunCommandHandler {
 
         let response = RunCommandResponse {
             now: current_time_string(),
+            command_duration_ms: command_duration.as_millis(),
             command_info: self.command_info.clone(),
             command_output: combined_output,
         };
