@@ -2,18 +2,18 @@ use getset::Getters;
 
 use log::info;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
-#[derive(Debug, Clone, Deserialize, Getters)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
-pub struct ServerInfo {
+pub struct ServerConfiguration {
     socket_path: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Getters)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct CommandInfo {
     id: String,
@@ -22,14 +22,22 @@ pub struct CommandInfo {
     args: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Getters)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
-pub struct Configuration {
-    server_info: ServerInfo,
+pub struct CommandConfiguration {
     commands: Vec<CommandInfo>,
 }
 
-pub async fn read_configuration(config_file: &str) -> Result<Configuration, Box<dyn std::error::Error>> {
+#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[getset(get = "pub")]
+pub struct Configuration {
+    server_configuration: ServerConfiguration,
+    command_configuration: CommandConfiguration,
+}
+
+pub async fn read_configuration(
+    config_file: &str,
+) -> Result<Configuration, Box<dyn std::error::Error>> {
     info!("reading {}", config_file);
 
     let mut file = File::open(config_file).await?;

@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
@@ -72,6 +73,12 @@ struct DebugResponse {
 
 struct DebugHandler {}
 
+impl DebugHandler {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
 #[async_trait]
 impl RequestHandler for DebugHandler {
     async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
@@ -101,15 +108,38 @@ impl RequestHandler for DebugHandler {
     }
 }
 
+struct AllCommandsHandler {
+    commands: Vec<crate::config::CommandInfo>,
+}
+
+impl AllCommandsHandler {
+    fn new(commands: Vec<crate::config::CommandInfo>) -> Self {
+        Self { commands }
+    }
+}
+
+#[async_trait]
+impl RequestHandler for AllCommandsHandler {
+    async fn handle(&self, _request: FastCGIRequest) -> HttpResponse {
+        build_json_response(&self.commands)
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 struct CommandResponse {
     command_output: String,
 }
 
-struct CommandHandler {}
+struct RunCommandHandler {}
+
+impl RunCommandHandler {
+    fn new() -> Self {
+        Self {}
+    }
+}
 
 #[async_trait]
-impl RequestHandler for CommandHandler {
+impl RequestHandler for RunCommandHandler {
     async fn handle(&self, _request: FastCGIRequest) -> HttpResponse {
         let command_result = Command::new("ls").arg("-latrh").output().await;
 
@@ -146,24 +176,12 @@ impl Route {
     }
 }
 
-pub struct Router {
+struct Router {
     routes: Vec<Route>,
 }
 
 impl Router {
-    pub fn new() -> Self {
-        let mut routes = Vec::new();
-
-        routes.push(Route {
-            url_prefix: "/cgi-bin/debug".to_string(),
-            request_handler: Box::new(DebugHandler {}),
-        });
-
-        routes.push(Route {
-            url_prefix: "/cgi-bin/commands/ls".to_string(),
-            request_handler: Box::new(CommandHandler {}),
-        });
-
+    fn new(routes: Vec<Route>) -> Self {
         Self { routes }
     }
 }
@@ -183,4 +201,25 @@ impl RequestHandler for Router {
             build_status_code_response(http::StatusCode::BAD_REQUEST)
         }
     }
+}
+
+pub fn create_handlers(configuration: &crate::config::Configuration) -> Arc<dyn RequestHandler> {
+    let mut routes = Vec::new();
+
+    routes.push(Route {
+        url_prefix: "/cgi-bin/debug".to_string(),
+        request_handler: Box::new(DebugHandler::new()),
+    });
+
+    routes.push(Route {
+        url_prefix: "/cgi-bin/commands".to_string(),
+        request_handler: Box::new(AllCommandsHandler::new(configuration.command_configuration().commands().clone())),
+    });
+
+    routes.push(Route {
+        url_prefix: "/cgi-bin/commands/ls".to_string(),
+        request_handler: Box::new(RunCommandHandler::new()),
+    });
+
+    Arc::new(Router::new(routes))
 }

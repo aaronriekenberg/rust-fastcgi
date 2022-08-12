@@ -1,15 +1,17 @@
 {
-    "server_info": {
+    "server_configuration": {
         "socket_path": "./socket"
     },
-    "commands": [
-        {
-            "id": "ls",
-            "description": "ls",
-            "command": "/bin/ls",
-            "args": [
-                "-latrh"
-            ]
-        }
-    ]
+    "command_configuration": {
+        "commands": [
+            {
+                "id": "ls",
+                "description": "ls",
+                "command": "/bin/ls",
+                "args": [
+                    "-latrh"
+                ]
+            }
+        ]
+    }
 }

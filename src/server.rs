@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::Arc;
 
-use crate::handlers::RequestHandler;
-
 use log::{debug, error, info, warn};
 
 use tokio::net::{unix::OwnedWriteHalf, UnixListener};
@@ -73,13 +71,11 @@ fn request_to_fastcgi_request(
 pub async fn run_server(
     configuration: crate::config::Configuration,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let commands = configuration.commands();
-    info!("commands.len() = {}", commands.len());
 
     // let addr = "127.0.0.1:8080";
     // let listener = TcpListener::bind(addr).await.unwrap();
 
-    let path = configuration.server_info().socket_path();
+    let path = configuration.server_configuration().socket_path();
 
     let remove_result = tokio::fs::remove_file(path).await;
     debug!("remove_result = {:?}", remove_result);
@@ -88,7 +84,7 @@ pub async fn run_server(
 
     info!("listening on {:?}", listener.local_addr()?);
 
-    let router = Arc::new(crate::handlers::Router::new());
+    let handlers = crate::handlers::create_handlers(&configuration);
 
     loop {
         let connection = listener.accept().await;
@@ -101,7 +97,7 @@ pub async fn run_server(
             Ok((stream, address)) => {
                 debug!("Connection from {:?}", address);
 
-                let conn_router = Arc::clone(&router);
+                let conn_handlers = Arc::clone(&handlers);
 
                 // If the socket connection was established successfully spawn a new task to handle
                 // the requests that the webserver will send us.
@@ -112,14 +108,14 @@ pub async fn run_server(
 
                     // Loop over the requests via the next method and process them.
                     while let Ok(Some(request)) = requests.next().await {
-                        let request_router = Arc::clone(&conn_router);
+                        let request_handlers = Arc::clone(&conn_handlers);
 
                         if let Err(err) = request
                             .process(|request| async move {
                                 let fastcgi_request =
                                     request_to_fastcgi_request(Arc::clone(&request));
 
-                                let response = request_router.handle(fastcgi_request).await;
+                                let response = request_handlers.handle(fastcgi_request).await;
 
                                 send_response(request, response).await.unwrap()
                             })
