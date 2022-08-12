@@ -1,23 +1,38 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap};
 
 use async_trait::async_trait;
 
-use log::warn;
+use getset::Getters;
 
-use tokio::net::unix::OwnedWriteHalf;
+use log::warn;
 
 use tokio::process::Command;
 
-use tokio_fastcgi::Request;
-
 use serde::Serialize;
+
+#[derive(Debug, Getters)]
+#[getset(get = "pub")]
+pub struct FastCGIRequest {
+    role: &'static str,
+    request_id: u16,
+    params: HashMap<String, String>,
+}
+
+impl FastCGIRequest {
+    pub fn new(role: &'static str, request_id: u16, params: HashMap<String, String>) -> Self {
+        Self {
+            role,
+            request_id,
+            params,
+        }
+    }
+}
 
 pub type HttpResponse = http::Response<Option<String>>;
 
 #[async_trait]
 pub trait RequestHandler: Send + Sync {
-    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse;
+    async fn handle(&self, request: FastCGIRequest) -> HttpResponse;
 }
 
 fn build_json_response(response_dto: impl Serialize) -> HttpResponse {
@@ -59,30 +74,26 @@ struct DebugHandler {}
 
 #[async_trait]
 impl RequestHandler for DebugHandler {
-    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
+    async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
         let mut debug_response = DebugResponse {
-            role: match request.role {
-                tokio_fastcgi::Role::Authorizer => "Authorizer",
-                tokio_fastcgi::Role::Filter => "Filter",
-                tokio_fastcgi::Role::Responder => "Responder",
-            },
-            request_id: request.get_request_id(),
+            role: request.role(),
+            request_id: *request.request_id(),
             ..Default::default()
         };
 
-        if let Some(str_params) = request.str_params_iter() {
-            for param in str_params {
-                let value = param.1.unwrap_or("[Invalid UTF8]").to_string();
+        for param in request.params().iter() {
+            let lower_case_key = param.0.to_ascii_lowercase();
+            let value = param.1;
 
-                let lower_case_key = param.0.to_ascii_lowercase();
-                if lower_case_key.starts_with("http_") {
-                    let http_header_key = &lower_case_key[5..];
-                    debug_response
-                        .http_headers
-                        .insert(http_header_key.to_string(), value);
-                } else {
-                    debug_response.other_params.insert(lower_case_key, value);
-                }
+            if lower_case_key.starts_with("http_") {
+                let http_header_key = &lower_case_key[5..];
+                debug_response
+                    .http_headers
+                    .insert(http_header_key.to_string(), value.clone());
+            } else {
+                debug_response
+                    .other_params
+                    .insert(lower_case_key, value.clone());
             }
         }
 
@@ -99,7 +110,7 @@ struct CommandHandler {}
 
 #[async_trait]
 impl RequestHandler for CommandHandler {
-    async fn handle(&self, _request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
+    async fn handle(&self, _request: FastCGIRequest) -> HttpResponse {
         let command_result = Command::new("ls").arg("-latrh").output().await;
 
         let output = match command_result {
@@ -159,8 +170,8 @@ impl Router {
 
 #[async_trait]
 impl RequestHandler for Router {
-    async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
-        if let Some(request_uri) = request.get_str_param("request_uri").map(String::from) {
+    async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
+        if let Some(request_uri) = request.params().get("request_uri").map(String::from) {
             for route in &self.routes {
                 if route.matches(&request_uri) {
                     return route.request_handler.handle(request).await;

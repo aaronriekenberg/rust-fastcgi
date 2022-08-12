@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::Arc;
 
@@ -50,8 +51,28 @@ async fn send_response(
     Ok(RequestResult::Complete(0))
 }
 
-pub async fn run_server(configuration: crate::config::Configuration) -> Result<(), Box<dyn std::error::Error>> {
+fn request_to_fastcgi_request(
+    request: Arc<Request<OwnedWriteHalf>>,
+) -> crate::handlers::FastCGIRequest {
+    let role = match request.role {
+        tokio_fastcgi::Role::Authorizer => "Authorizer",
+        tokio_fastcgi::Role::Filter => "Filter",
+        tokio_fastcgi::Role::Responder => "Responder",
+    };
 
+    let params: HashMap<String, String> = match request.str_params_iter() {
+        Some(iter) => iter
+            .map(|v| (v.0.to_string(), v.1.unwrap_or("[Invalid UTF8]").to_string()))
+            .collect(),
+        None => HashMap::new(),
+    };
+
+    crate::handlers::FastCGIRequest::new(role, request.get_request_id(), params)
+}
+
+pub async fn run_server(
+    configuration: crate::config::Configuration,
+) -> Result<(), Box<dyn std::error::Error>> {
     let commands = configuration.commands();
     info!("commands.len() = {}", commands.len());
 
@@ -95,7 +116,10 @@ pub async fn run_server(configuration: crate::config::Configuration) -> Result<(
 
                         if let Err(err) = request
                             .process(|request| async move {
-                                let response = request_router.handle(Arc::clone(&request)).await;
+                                let fastcgi_request =
+                                    request_to_fastcgi_request(Arc::clone(&request));
+
+                                let response = request_router.handle(fastcgi_request).await;
 
                                 send_response(request, response).await.unwrap()
                             })
