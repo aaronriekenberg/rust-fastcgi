@@ -11,6 +11,14 @@
                 "args": [
                     "-latrh"
                 ]
+            },
+            {
+                "id": "uname",
+                "description": "uname",
+                "command": "/usr/bin/uname",
+                "args": [
+                    "-a"
+                ]
             }
         ]
     }

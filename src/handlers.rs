@@ -126,29 +126,34 @@ impl RequestHandler for AllCommandsHandler {
 }
 
 #[derive(Debug, Default, Serialize)]
-struct CommandResponse {
+struct RunCommandResponse {
     command_output: String,
 }
 
-struct RunCommandHandler {}
+struct RunCommandHandler {
+    command_info: crate::config::CommandInfo,
+}
 
 impl RunCommandHandler {
-    fn new() -> Self {
-        Self {}
+    fn new(command_info: crate::config::CommandInfo) -> Self {
+        Self { command_info }
     }
 }
 
 #[async_trait]
 impl RequestHandler for RunCommandHandler {
     async fn handle(&self, _request: FastCGIRequest) -> HttpResponse {
-        let command_result = Command::new("ls").arg("-latrh").output().await;
+        let command_result = Command::new(self.command_info.command())
+            .args(self.command_info.args())
+            .output()
+            .await;
 
         let output = match command_result {
             Err(err) => {
-                let command_response = CommandResponse {
+                let response = RunCommandResponse {
                     command_output: format!("error running command {}", err),
                 };
-                return build_json_response(command_response);
+                return build_json_response(response);
             }
             Ok(output) => output,
         };
@@ -157,22 +162,22 @@ impl RequestHandler for RunCommandHandler {
         combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
         combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
 
-        let command_response = CommandResponse {
+        let response = RunCommandResponse {
             command_output: combined_output,
         };
 
-        build_json_response(command_response)
+        build_json_response(response)
     }
 }
 
 struct Route {
-    url_prefix: String,
+    expected_uri: String,
     request_handler: Box<dyn RequestHandler>,
 }
 
 impl Route {
     fn matches(&self, request_uri: &str) -> bool {
-        request_uri.starts_with(&self.url_prefix)
+        request_uri == self.expected_uri
     }
 }
 
@@ -207,19 +212,25 @@ pub fn create_handlers(configuration: &crate::config::Configuration) -> Arc<dyn 
     let mut routes = Vec::new();
 
     routes.push(Route {
-        url_prefix: "/cgi-bin/debug".to_string(),
+        expected_uri: "/cgi-bin/debug".to_string(),
         request_handler: Box::new(DebugHandler::new()),
     });
 
     routes.push(Route {
-        url_prefix: "/cgi-bin/commands".to_string(),
-        request_handler: Box::new(AllCommandsHandler::new(configuration.command_configuration().commands().clone())),
+        expected_uri: "/cgi-bin/commands".to_string(),
+        request_handler: Box::new(AllCommandsHandler::new(
+            configuration.command_configuration().commands().clone(),
+        )),
     });
 
-    routes.push(Route {
-        url_prefix: "/cgi-bin/commands/ls".to_string(),
-        request_handler: Box::new(RunCommandHandler::new()),
-    });
+    for command_info in configuration.command_configuration().commands() {
+        let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
+
+        routes.push(Route {
+            expected_uri,
+            request_handler: Box::new(RunCommandHandler::new(command_info.clone())),
+        });
+    }
 
     Arc::new(Router::new(routes))
 }
