@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use chrono::prelude::Local;
+
 use getset::Getters;
 
 use log::warn;
@@ -63,6 +65,10 @@ fn build_status_code_response(status_code: http::StatusCode) -> HttpResponse {
         .unwrap()
 }
 
+fn current_time_string() -> String {
+    Local::now().format("%Y-%m-%d %H:%M:%S%.9f %z").to_string()
+}
+
 #[derive(Debug, Default, Serialize)]
 struct RequestInfoResponse {
     role: &'static str,
@@ -98,9 +104,7 @@ impl RequestHandler for RequestInfoHandler {
                     .http_headers
                     .insert(http_header_key.to_string(), value.clone());
             } else {
-                response
-                    .other_params
-                    .insert(lower_case_key, value.clone());
+                response.other_params.insert(lower_case_key, value.clone());
             }
         }
 
@@ -127,6 +131,7 @@ impl RequestHandler for AllCommandsHandler {
 
 #[derive(Debug, Serialize)]
 struct RunCommandResponse {
+    now: String,
     command_info: crate::config::CommandInfo,
     command_output: String,
 }
@@ -152,6 +157,7 @@ impl RequestHandler for RunCommandHandler {
         let output = match command_result {
             Err(err) => {
                 let response = RunCommandResponse {
+                    now: current_time_string(),
                     command_info: self.command_info.clone(),
                     command_output: format!("error running command {}", err),
                 };
@@ -165,6 +171,7 @@ impl RequestHandler for RunCommandHandler {
         combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
 
         let response = RunCommandResponse {
+            now: current_time_string(),
             command_info: self.command_info.clone(),
             command_output: combined_output,
         };
