@@ -64,25 +64,25 @@ fn build_status_code_response(status_code: http::StatusCode) -> HttpResponse {
 }
 
 #[derive(Debug, Default, Serialize)]
-struct DebugResponse {
+struct RequestInfoResponse {
     role: &'static str,
     request_id: u16,
     http_headers: BTreeMap<String, String>,
     other_params: BTreeMap<String, String>,
 }
 
-struct DebugHandler {}
+struct RequestInfoHandler {}
 
-impl DebugHandler {
+impl RequestInfoHandler {
     fn new() -> Self {
         Self {}
     }
 }
 
 #[async_trait]
-impl RequestHandler for DebugHandler {
+impl RequestHandler for RequestInfoHandler {
     async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
-        let mut debug_response = DebugResponse {
+        let mut response = RequestInfoResponse {
             role: request.role(),
             request_id: *request.request_id(),
             ..Default::default()
@@ -94,17 +94,17 @@ impl RequestHandler for DebugHandler {
 
             if lower_case_key.starts_with("http_") {
                 let http_header_key = &lower_case_key[5..];
-                debug_response
+                response
                     .http_headers
                     .insert(http_header_key.to_string(), value.clone());
             } else {
-                debug_response
+                response
                     .other_params
                     .insert(lower_case_key, value.clone());
             }
         }
 
-        build_json_response(debug_response)
+        build_json_response(response)
     }
 }
 
@@ -215,8 +215,8 @@ pub fn create_handlers(configuration: &crate::config::Configuration) -> Arc<dyn 
     let mut routes = Vec::new();
 
     routes.push(Route {
-        expected_uri: "/cgi-bin/debug".to_string(),
-        request_handler: Box::new(DebugHandler::new()),
+        expected_uri: "/cgi-bin/debug/request_info".to_string(),
+        request_handler: Box::new(RequestInfoHandler::new()),
     });
 
     routes.push(Route {
