@@ -171,7 +171,7 @@ impl Router {
 #[async_trait]
 impl RequestHandler for Router {
     async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
-        if let Some(request_uri) = request.params().get("request_uri").map(String::from) {
+        if let Some(request_uri) = request.params().get("request_uri") {
             for route in &self.routes {
                 if route.matches(&request_uri) {
                     return route.request_handler.handle(request).await;
