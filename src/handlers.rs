@@ -49,6 +49,8 @@ fn build_status_code_response(status_code: http::StatusCode) -> HttpResponse {
 
 #[derive(Debug, Default, Serialize)]
 struct DebugResponse {
+    role: &'static str,
+    request_id: u16,
     http_headers: BTreeMap<String, String>,
     other_params: BTreeMap<String, String>,
 }
@@ -58,7 +60,15 @@ struct DebugHandler {}
 #[async_trait]
 impl RequestHandler for DebugHandler {
     async fn handle(&self, request: Arc<Request<OwnedWriteHalf>>) -> HttpResponse {
-        let mut debug_response = DebugResponse::default();
+        let mut debug_response = DebugResponse {
+            role: match request.role {
+                tokio_fastcgi::Role::Authorizer => "Authorizer",
+                tokio_fastcgi::Role::Filter => "Filter",
+                tokio_fastcgi::Role::Responder => "Responder",
+            },
+            request_id: request.get_request_id(),
+            ..Default::default()
+        };
 
         if let Some(str_params) = request.str_params_iter() {
             for param in str_params {
