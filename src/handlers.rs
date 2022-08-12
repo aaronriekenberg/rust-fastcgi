@@ -125,8 +125,9 @@ impl RequestHandler for AllCommandsHandler {
     }
 }
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Serialize)]
 struct RunCommandResponse {
+    command_info: crate::config::CommandInfo,
     command_output: String,
 }
 
@@ -151,6 +152,7 @@ impl RequestHandler for RunCommandHandler {
         let output = match command_result {
             Err(err) => {
                 let response = RunCommandResponse {
+                    command_info: self.command_info.clone(),
                     command_output: format!("error running command {}", err),
                 };
                 return build_json_response(response);
@@ -163,6 +165,7 @@ impl RequestHandler for RunCommandHandler {
         combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
 
         let response = RunCommandResponse {
+            command_info: self.command_info.clone(),
             command_output: combined_output,
         };
 
