@@ -4,13 +4,13 @@ use std::sync::Arc;
 
 use log::{debug, error, info, warn};
 
-use tokio::net::{unix::OwnedWriteHalf, UnixListener};
+use tokio::{io::AsyncWrite, net::UnixListener};
 
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
 /// Encodes the HTTP status code and the response string and sends it back to the webserver.
-async fn send_response(
-    request: Arc<Request<OwnedWriteHalf>>,
+async fn send_response<W: AsyncWrite + Unpin>(
+    request: Arc<Request<W>>,
     response: crate::handlers::HttpResponse,
 ) -> Result<RequestResult, tokio_fastcgi::Error> {
     debug!("send_response response = {:?}", response);
@@ -49,8 +49,8 @@ async fn send_response(
     Ok(RequestResult::Complete(0))
 }
 
-fn request_to_fastcgi_request(
-    request: Arc<Request<OwnedWriteHalf>>,
+fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
+    request: Arc<Request<W>>,
 ) -> crate::handlers::FastCGIRequest {
     let role = match request.role {
         tokio_fastcgi::Role::Authorizer => "Authorizer",
@@ -71,10 +71,6 @@ fn request_to_fastcgi_request(
 pub async fn run_server(
     configuration: crate::config::Configuration,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
-    // let addr = "127.0.0.1:8080";
-    // let listener = TcpListener::bind(addr).await.unwrap();
-
     let path = configuration.server_configuration().socket_path();
 
     let remove_result = tokio::fs::remove_file(path).await;
