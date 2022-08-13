@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use log::{debug, error, info, warn};
@@ -50,6 +51,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
 }
 
 fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
+    connection_id: u64,
     request: Arc<Request<W>>,
 ) -> crate::handlers::FastCGIRequest {
     let role = match request.role {
@@ -65,7 +67,7 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
         None => HashMap::new(),
     };
 
-    crate::handlers::FastCGIRequest::new(role, request.get_request_id(), params)
+    crate::handlers::FastCGIRequest::new(role, connection_id, request.get_request_id(), params)
 }
 
 pub async fn run_server(
@@ -82,6 +84,8 @@ pub async fn run_server(
 
     let handlers = crate::handlers::create_handlers(&configuration);
 
+    let connection_counter = AtomicU64::new(0);
+
     loop {
         let connection = listener.accept().await;
         // Accept new connections
@@ -91,7 +95,12 @@ pub async fn run_server(
                 break;
             }
             Ok((stream, address)) => {
-                debug!("Connection from {:?}", address);
+                let connection_id = connection_counter.fetch_add(1, Ordering::Relaxed);
+
+                debug!(
+                    "Connection from {:?} connection_id = {}",
+                    address, connection_id
+                );
 
                 let conn_handlers = Arc::clone(&handlers);
 
@@ -109,7 +118,7 @@ pub async fn run_server(
                         if let Err(err) = request
                             .process(|request| async move {
                                 let fastcgi_request =
-                                    request_to_fastcgi_request(Arc::clone(&request));
+                                    request_to_fastcgi_request(connection_id, Arc::clone(&request));
 
                                 let response = request_handlers.handle(fastcgi_request).await;
 

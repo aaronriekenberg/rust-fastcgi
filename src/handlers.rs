@@ -18,14 +18,21 @@ use serde::Serialize;
 #[getset(get = "pub")]
 pub struct FastCGIRequest {
     role: &'static str,
+    connection_id: u64,
     request_id: u16,
     params: HashMap<String, String>,
 }
 
 impl FastCGIRequest {
-    pub fn new(role: &'static str, request_id: u16, params: HashMap<String, String>) -> Self {
+    pub fn new(
+        role: &'static str,
+        connection_id: u64,
+        request_id: u16,
+        params: HashMap<String, String>,
+    ) -> Self {
         Self {
             role,
+            connection_id,
             request_id,
             params,
         }
@@ -73,6 +80,7 @@ fn current_time_string() -> String {
 #[derive(Debug, Default, Serialize)]
 struct RequestInfoResponse {
     role: &'static str,
+    connection_id: u64,
     request_id: u16,
     http_headers: BTreeMap<String, String>,
     other_params: BTreeMap<String, String>,
@@ -91,6 +99,7 @@ impl RequestHandler for RequestInfoHandler {
     async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
         let mut response = RequestInfoResponse {
             role: request.role(),
+            connection_id: *request.connection_id(),
             request_id: *request.request_id(),
             ..Default::default()
         };
