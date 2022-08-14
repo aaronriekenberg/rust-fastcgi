@@ -78,12 +78,12 @@ fn current_time_string() -> String {
 }
 
 #[derive(Debug, Default, Serialize)]
-struct RequestInfoResponse {
+struct RequestInfoResponse<'a> {
     role: &'static str,
     connection_id: u64,
     request_id: u16,
-    http_headers: BTreeMap<String, String>,
-    other_params: BTreeMap<String, String>,
+    http_headers: BTreeMap<&'a str, &'a str>,
+    other_params: BTreeMap<&'a str, &'a str>,
 }
 
 struct RequestInfoHandler {}
@@ -105,16 +105,14 @@ impl RequestHandler for RequestInfoHandler {
         };
 
         for param in request.params().iter() {
-            let lower_case_key = param.0.to_ascii_lowercase();
+            let key = param.0;
             let value = param.1;
 
-            if lower_case_key.starts_with("http_") {
-                let http_header_key = &lower_case_key[5..];
-                response
-                    .http_headers
-                    .insert(http_header_key.to_string(), value.clone());
+            if key.to_ascii_lowercase().starts_with("http_") {
+                let http_header_key = &key[5..];
+                response.http_headers.insert(http_header_key, value);
             } else {
-                response.other_params.insert(lower_case_key, value.clone());
+                response.other_params.insert(key, value);
             }
         }
 
