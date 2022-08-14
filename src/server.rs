@@ -162,7 +162,7 @@ impl Server {
         });
     }
 
-    pub async fn run(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn run(self) -> Result<(), Box<dyn Error>> {
         let listener = self.create_listener().await?;
 
         loop {
