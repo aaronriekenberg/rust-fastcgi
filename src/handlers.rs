@@ -104,10 +104,7 @@ impl RequestHandler for RequestInfoHandler {
             ..Default::default()
         };
 
-        for param in request.params().iter() {
-            let key = param.0;
-            let value = param.1;
-
+        for (key, value) in request.params().iter() {
             if key.to_ascii_lowercase().starts_with("http_") {
                 let http_header_key = &key[5..];
                 response.http_headers.insert(http_header_key, value);
