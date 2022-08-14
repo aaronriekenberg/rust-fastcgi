@@ -10,5 +10,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let configuration = config::read_configuration("config.json").await?;
 
-    crate::server::run_server(configuration).await
+    let server = crate::server::Server::new(configuration);
+    server.run().await?;
+
+    Ok(())
 }
