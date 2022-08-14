@@ -6,6 +6,8 @@ use std::sync::Arc;
 
 use log::{debug, error, info, warn};
 
+use tokio::net::unix::SocketAddr;
+use tokio::net::UnixStream;
 use tokio::{io::AsyncWrite, net::UnixListener};
 
 use tokio_fastcgi::{Request, RequestResult, Requests};
@@ -102,12 +104,51 @@ impl Server {
         let listener = UnixListener::bind(path)?;
 
         info!("listening on {:?}", listener.local_addr()?);
-        
+
         Ok(listener)
     }
 
     fn next_connection_id(&self) -> u64 {
         self.connection_counter.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn handle_connection(&self, stream: UnixStream, address: SocketAddr) {
+        let connection_id = self.next_connection_id();
+
+        debug!(
+            "Connection from {:?} connection_id = {}",
+            address, connection_id
+        );
+
+        let conn_handlers = Arc::clone(&self.handlers);
+
+        // If the socket connection was established successfully spawn a new task to handle
+        // the requests that the webserver will send us.
+        tokio::spawn(async move {
+            // Create a new requests handler it will collect the requests from the server and
+            // supply a streaming interface.
+            let mut requests = Requests::from_split_socket(stream.into_split(), 10, 10);
+
+            // Loop over the requests via the next method and process them.
+            while let Ok(Some(request)) = requests.next().await {
+                let request_handlers = Arc::clone(&conn_handlers);
+
+                if let Err(err) = request
+                    .process(|request| async move {
+                        let fastcgi_request =
+                            request_to_fastcgi_request(connection_id, Arc::clone(&request));
+
+                        let response = request_handlers.handle(fastcgi_request).await;
+
+                        send_response(request, response).await
+                    })
+                    .await
+                {
+                    // This is the error handler that is called if the process call returns an error.
+                    warn!("Processing request failed: {}", err);
+                }
+            }
+        });
     }
 
     pub async fn run(&self) -> Result<(), Box<dyn Error>> {
@@ -122,44 +163,7 @@ impl Server {
                     break;
                 }
                 Ok((stream, address)) => {
-                    let connection_id = self.next_connection_id();
-
-                    debug!(
-                        "Connection from {:?} connection_id = {}",
-                        address, connection_id
-                    );
-
-                    let conn_handlers = Arc::clone(&self.handlers);
-
-                    // If the socket connection was established successfully spawn a new task to handle
-                    // the requests that the webserver will send us.
-                    tokio::spawn(async move {
-                        // Create a new requests handler it will collect the requests from the server and
-                        // supply a streaming interface.
-                        let mut requests = Requests::from_split_socket(stream.into_split(), 10, 10);
-
-                        // Loop over the requests via the next method and process them.
-                        while let Ok(Some(request)) = requests.next().await {
-                            let request_handlers = Arc::clone(&conn_handlers);
-
-                            if let Err(err) = request
-                                .process(|request| async move {
-                                    let fastcgi_request = request_to_fastcgi_request(
-                                        connection_id,
-                                        Arc::clone(&request),
-                                    );
-
-                                    let response = request_handlers.handle(fastcgi_request).await;
-
-                                    send_response(request, response).await
-                                })
-                                .await
-                            {
-                                // This is the error handler that is called if the process call returns an error.
-                                warn!("Processing request failed: {}", err);
-                            }
-                        }
-                    });
+                    self.handle_connection(stream, address);
                 }
             }
         }
