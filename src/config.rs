@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use getset::Getters;
 
 use log::info;
@@ -38,7 +40,7 @@ pub struct Configuration {
 
 pub async fn read_configuration(
     config_file: &str,
-) -> Result<Configuration, Box<dyn std::error::Error>> {
+) -> Result<Configuration, Box<dyn Error>> {
     info!("reading {}", config_file);
 
     let mut file = File::open(config_file).await?;

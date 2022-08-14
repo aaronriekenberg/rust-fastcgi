@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use tokio_fastcgi::{Request, RequestResult, Requests};
 async fn send_response<W: AsyncWrite + Unpin>(
     request: Arc<Request<W>>,
     response: crate::handlers::HttpResponse,
-) -> Result<RequestResult, tokio_fastcgi::Error> {
+) -> RequestResult {
     debug!("send_response response = {:?}", response);
 
     let mut response_string = String::new();
@@ -42,12 +43,16 @@ async fn send_response<W: AsyncWrite + Unpin>(
         response_string.push_str(data);
     }
 
-    request
-        .get_stdout()
-        .write(response_string.as_bytes())
-        .await?;
-
-    Ok(RequestResult::Complete(0))
+    match request.get_stdout().write(response_string.as_bytes()).await {
+        Ok(size) => {
+            debug!("request.get_stdout().write() success bytes = {}", size);
+            RequestResult::Complete(0)
+        }
+        Err(e) => {
+            warn!("request.get_stdout().write() error e = {}", e);
+            RequestResult::Complete(1)
+        }
+    }
 }
 
 fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
@@ -70,9 +75,7 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
     crate::handlers::FastCGIRequest::new(role, connection_id, request.get_request_id(), params)
 }
 
-pub async fn run_server(
-    configuration: crate::config::Configuration,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_server(configuration: crate::config::Configuration) -> Result<(), Box<dyn Error>> {
     let path = configuration.server_configuration().socket_path();
 
     let remove_result = tokio::fs::remove_file(path).await;
@@ -122,7 +125,7 @@ pub async fn run_server(
 
                                 let response = request_handlers.handle(fastcgi_request).await;
 
-                                send_response(request, response).await.unwrap()
+                                send_response(request, response).await
                             })
                             .await
                         {
