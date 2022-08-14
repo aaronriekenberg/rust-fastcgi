@@ -79,7 +79,7 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
 
 pub struct Server {
     connection_counter: AtomicU64,
-    configuration: crate::config::Configuration,
+    server_configuration: crate::config::ServerConfiguration,
     handlers: Arc<dyn crate::handlers::RequestHandler>,
 }
 
@@ -89,13 +89,13 @@ impl Server {
 
         Self {
             connection_counter: AtomicU64::new(0),
-            configuration: configuration.clone(),
+            server_configuration: configuration.server_configuration().clone(),
             handlers,
         }
     }
 
     async fn create_listener(&self) -> Result<UnixListener, Box<dyn Error>> {
-        let path = self.configuration.server_configuration().socket_path();
+        let path = self.server_configuration.socket_path();
 
         // do not fail on remove error, the path may not exist.
         let remove_result = tokio::fs::remove_file(path).await;
@@ -122,12 +122,23 @@ impl Server {
 
         let conn_handlers = Arc::clone(&self.handlers);
 
+        let max_concurrent_connections = *self
+            .server_configuration
+            .max_concurrent_connections();
+        let max_requests_per_connection = *self
+            .server_configuration
+            .max_requests_per_connection();
+
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
         tokio::spawn(async move {
             // Create a new requests handler it will collect the requests from the server and
             // supply a streaming interface.
-            let mut requests = Requests::from_split_socket(stream.into_split(), 10, 10);
+            let mut requests = Requests::from_split_socket(
+                stream.into_split(),
+                max_concurrent_connections,
+                max_requests_per_connection,
+            );
 
             // Loop over the requests via the next method and process them.
             while let Ok(Some(request)) = requests.next().await {

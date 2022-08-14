@@ -13,6 +13,8 @@ use tokio::io::AsyncReadExt;
 #[getset(get = "pub")]
 pub struct ServerConfiguration {
     socket_path: String,
+    max_concurrent_connections: u8,
+    max_requests_per_connection: u8,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
