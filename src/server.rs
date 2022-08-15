@@ -59,8 +59,8 @@ async fn send_response<W: AsyncWrite + Unpin>(
 
 fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
     connection_id: u64,
-    request: Arc<Request<W>>,
-) -> crate::handlers::FastCGIRequest {
+    request: &Request<W>,
+) -> Arc<crate::handlers::FastCGIRequest> {
     let role = match request.role {
         tokio_fastcgi::Role::Authorizer => "Authorizer",
         tokio_fastcgi::Role::Filter => "Filter",
@@ -74,7 +74,12 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
         None => HashMap::new(),
     };
 
-    crate::handlers::FastCGIRequest::new(role, connection_id, request.get_request_id(), params)
+    Arc::new(crate::handlers::FastCGIRequest::new(
+        role,
+        connection_id,
+        request.get_request_id(),
+        params,
+    ))
 }
 
 pub struct Server {
@@ -122,12 +127,8 @@ impl Server {
 
         let conn_handlers = Arc::clone(&self.handlers);
 
-        let max_concurrent_connections = *self
-            .server_configuration
-            .max_concurrent_connections();
-        let max_requests_per_connection = *self
-            .server_configuration
-            .max_requests_per_connection();
+        let max_concurrent_connections = *self.server_configuration.max_concurrent_connections();
+        let max_requests_per_connection = *self.server_configuration.max_requests_per_connection();
 
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
@@ -144,11 +145,12 @@ impl Server {
             while let Ok(Some(request)) = requests.next().await {
                 let request_handlers = Arc::clone(&conn_handlers);
 
+                let fastcgi_request = request_to_fastcgi_request(connection_id, &request);
+
+                let fastcgi_request_clone = Arc::clone(&fastcgi_request);
+
                 if let Err(err) = request
                     .process(|request| async move {
-                        let fastcgi_request =
-                            request_to_fastcgi_request(connection_id, Arc::clone(&request));
-
                         let response = request_handlers.handle(fastcgi_request).await;
 
                         send_response(request, response).await
@@ -156,7 +158,10 @@ impl Server {
                     .await
                 {
                     // This is the error handler that is called if the process call returns an error.
-                    warn!("Processing request failed: {}", err);
+                    warn!(
+                        "Processing request failed: request = {:?} err= {}",
+                        fastcgi_request_clone, err
+                    );
                 }
             }
         });
