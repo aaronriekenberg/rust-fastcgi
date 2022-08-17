@@ -60,7 +60,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
 fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
     connection_id: u64,
     request: &Request<W>,
-) -> Arc<crate::handlers::FastCGIRequest> {
+) -> crate::handlers::FastCGIRequest {
     let role = match request.role {
         tokio_fastcgi::Role::Authorizer => "Authorizer",
         tokio_fastcgi::Role::Filter => "Filter",
@@ -74,12 +74,7 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
         None => HashMap::new(),
     };
 
-    Arc::new(crate::handlers::FastCGIRequest::new(
-        role,
-        connection_id,
-        request.get_request_id(),
-        params,
-    ))
+    crate::handlers::FastCGIRequest::new(role, connection_id, request.get_request_id(), params)
 }
 
 pub struct Server {
@@ -145,12 +140,10 @@ impl Server {
             while let Ok(Some(request)) = requests.next().await {
                 let request_handlers = Arc::clone(&conn_handlers);
 
-                let fastcgi_request = request_to_fastcgi_request(connection_id, &request);
-
-                let log_err_request = Arc::clone(&fastcgi_request);
-
                 if let Err(err) = request
                     .process(|request| async move {
+                        let fastcgi_request = request_to_fastcgi_request(connection_id, &request);
+
                         let response = request_handlers.handle(fastcgi_request).await;
 
                         send_response(request, response).await
@@ -158,10 +151,7 @@ impl Server {
                     .await
                 {
                     // This is the error handler that is called if the process call returns an error.
-                    warn!(
-                        "Processing request failed: request = {:?} err= {}",
-                        log_err_request, err,
-                    );
+                    warn!("Processing request failed: err = {}", err,);
                 }
             }
         });
