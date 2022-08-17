@@ -147,7 +147,7 @@ impl Server {
 
                 let fastcgi_request = request_to_fastcgi_request(connection_id, &request);
 
-                let fastcgi_request_clone = Arc::clone(&fastcgi_request);
+                let log_err_request = Arc::clone(&fastcgi_request);
 
                 if let Err(err) = request
                     .process(|request| async move {
@@ -160,7 +160,7 @@ impl Server {
                     // This is the error handler that is called if the process call returns an error.
                     warn!(
                         "Processing request failed: request = {:?} err= {}",
-                        fastcgi_request_clone, err
+                        log_err_request, err,
                     );
                 }
             }
