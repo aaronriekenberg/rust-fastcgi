@@ -67,9 +67,9 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
         tokio_fastcgi::Role::Responder => "Responder",
     };
 
-    let params: HashMap<String, String> = match request.str_params_iter() {
+    let params: HashMap<&str, &str> = match request.str_params_iter() {
         Some(iter) => iter
-            .map(|v| (v.0.to_string(), v.1.unwrap_or("[Invalid UTF8]").to_string()))
+            .map(|v| (v.0, v.1.unwrap_or("[Invalid UTF8]")))
             .collect(),
         None => HashMap::new(),
     };

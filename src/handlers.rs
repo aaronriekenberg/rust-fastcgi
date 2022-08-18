@@ -16,19 +16,19 @@ use serde::Serialize;
 
 #[derive(Debug, Getters)]
 #[getset(get = "pub")]
-pub struct FastCGIRequest {
+pub struct FastCGIRequest<'a> {
     role: &'static str,
     connection_id: u64,
     request_id: u16,
-    params: HashMap<String, String>,
+    params: HashMap<&'a str, &'a str>,
 }
 
-impl FastCGIRequest {
+impl<'a> FastCGIRequest<'a> {
     pub fn new(
         role: &'static str,
         connection_id: u64,
         request_id: u16,
-        params: HashMap<String, String>,
+        params: HashMap<&'a str, &'a str>,
     ) -> Self {
         Self {
             role,
@@ -43,7 +43,7 @@ pub type HttpResponse = http::Response<Option<String>>;
 
 #[async_trait]
 pub trait RequestHandler: Send + Sync {
-    async fn handle(&self, request: FastCGIRequest) -> HttpResponse;
+    async fn handle<'a>(&self, request: FastCGIRequest<'a>) -> HttpResponse;
 }
 
 fn build_json_response(response_dto: impl Serialize) -> HttpResponse {
@@ -96,7 +96,7 @@ impl RequestInfoHandler {
 
 #[async_trait]
 impl RequestHandler for RequestInfoHandler {
-    async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
+    async fn handle<'a>(&self, request: FastCGIRequest<'a>) -> HttpResponse {
         let mut response = RequestInfoResponse {
             role: request.role(),
             connection_id: *request.connection_id(),
@@ -129,7 +129,7 @@ impl AllCommandsHandler {
 
 #[async_trait]
 impl RequestHandler for AllCommandsHandler {
-    async fn handle(&self, _request: FastCGIRequest) -> HttpResponse {
+    async fn handle<'a>(&self, _request: FastCGIRequest<'a>) -> HttpResponse {
         build_json_response(&self.commands)
     }
 }
@@ -154,7 +154,7 @@ impl RunCommandHandler {
 
 #[async_trait]
 impl RequestHandler for RunCommandHandler {
-    async fn handle(&self, _request: FastCGIRequest) -> HttpResponse {
+    async fn handle<'a>(&self, _request: FastCGIRequest<'a>) -> HttpResponse {
         let command_start_time = Instant::now();
 
         let command_result = Command::new(self.command_info.command())
@@ -215,7 +215,7 @@ impl Router {
 
 #[async_trait]
 impl RequestHandler for Router {
-    async fn handle(&self, request: FastCGIRequest) -> HttpResponse {
+    async fn handle<'a>(&self, request: FastCGIRequest<'a>) -> HttpResponse {
         if let Some(request_uri) = request.params().get("request_uri") {
             for route in &self.routes {
                 if route.matches(&request_uri) {
