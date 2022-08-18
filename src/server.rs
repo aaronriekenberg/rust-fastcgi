@@ -60,7 +60,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
 fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
     connection_id: u64,
     request: &Request<W>,
-) -> crate::handlers::FastCGIRequest {
+) -> crate::handlers::FastCGIRequest<'_> {
     let role = match request.role {
         tokio_fastcgi::Role::Authorizer => "Authorizer",
         tokio_fastcgi::Role::Filter => "Filter",
