@@ -5,6 +5,7 @@
         "max_requests_per_connection": 10
     },
     "command_configuration": {
+        "max_concurrent_commands": 10,
         "commands": [
             {
                 "id": "chronyc_sources",

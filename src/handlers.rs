@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
+use std::process::Output;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
@@ -11,6 +12,7 @@ use getset::Getters;
 use log::warn;
 
 use tokio::process::Command;
+use tokio::sync::{Semaphore, SemaphorePermit, TryAcquireError};
 
 use serde::Serialize;
 
@@ -143,27 +145,30 @@ struct RunCommandResponse {
 }
 
 struct RunCommandHandler {
+    run_command_semaphore: Arc<Semaphore>,
     command_info: crate::config::CommandInfo,
 }
 
 impl RunCommandHandler {
-    fn new(command_info: crate::config::CommandInfo) -> Self {
-        Self { command_info }
+    fn new(
+        run_command_semaphore: Arc<Semaphore>,
+        command_info: crate::config::CommandInfo,
+    ) -> Self {
+        Self {
+            run_command_semaphore,
+            command_info,
+        }
     }
-}
 
-#[async_trait]
-impl RequestHandler for RunCommandHandler {
-    async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
-        let command_start_time = Instant::now();
+    fn acquire_run_command_semaphore(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
+        self.run_command_semaphore.try_acquire()
+    }
 
-        let command_result = Command::new(self.command_info.command())
-            .args(self.command_info.args())
-            .output()
-            .await;
-
-        let command_duration = Instant::now() - command_start_time;
-
+    fn handle_command_result(
+        &self,
+        command_result: Result<Output, std::io::Error>,
+        command_duration: Duration,
+    ) -> HttpResponse {
         let output = match command_result {
             Err(err) => {
                 let response = RunCommandResponse {
@@ -189,6 +194,32 @@ impl RequestHandler for RunCommandHandler {
         };
 
         build_json_response(response)
+    }
+}
+
+#[async_trait]
+impl RequestHandler for RunCommandHandler {
+    async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
+        let permit = match self.acquire_run_command_semaphore() {
+            Err(err) => {
+                warn!("acquire_run_command_semaphore error {}", err);
+                return build_status_code_response(http::StatusCode::TOO_MANY_REQUESTS);
+            }
+            Ok(permit) => permit,
+        };
+
+        let command_start_time = Instant::now();
+
+        let command_result = Command::new(self.command_info.command())
+            .args(self.command_info.args())
+            .output()
+            .await;
+
+        let command_duration = Instant::now() - command_start_time;
+
+        drop(permit);
+
+        self.handle_command_result(command_result, command_duration)
     }
 }
 
@@ -245,13 +276,24 @@ pub fn create_handlers(configuration: &crate::config::Configuration) -> Arc<dyn 
         )),
     });
 
-    for command_info in configuration.command_configuration().commands() {
-        let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
+    if configuration.command_configuration().commands().len() > 0 {
+        let run_command_semaphore = Arc::new(Semaphore::new(
+            *configuration
+                .command_configuration()
+                .max_concurrent_commands(),
+        ));
 
-        routes.push(Route {
-            expected_uri,
-            request_handler: Box::new(RunCommandHandler::new(command_info.clone())),
-        });
+        for command_info in configuration.command_configuration().commands() {
+            let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
+
+            routes.push(Route {
+                expected_uri,
+                request_handler: Box::new(RunCommandHandler::new(
+                    Arc::clone(&run_command_semaphore),
+                    command_info.clone(),
+                )),
+            });
+        }
     }
 
     Arc::new(Router::new(routes))

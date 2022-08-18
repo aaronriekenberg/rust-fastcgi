@@ -30,6 +30,7 @@ pub struct CommandInfo {
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct CommandConfiguration {
+    max_concurrent_commands: usize,
     commands: Vec<CommandInfo>,
 }
 
