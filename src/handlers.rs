@@ -137,10 +137,10 @@ impl RequestHandler for AllCommandsHandler {
 }
 
 #[derive(Debug, Serialize)]
-struct RunCommandResponse {
+struct RunCommandResponse<'a> {
     now: String,
     command_duration_ms: u128,
-    command_info: crate::config::CommandInfo,
+    command_info: &'a crate::config::CommandInfo,
     command_output: String,
 }
 
@@ -174,7 +174,7 @@ impl RunCommandHandler {
                 let response = RunCommandResponse {
                     now: current_time_string(),
                     command_duration_ms: 0,
-                    command_info: self.command_info.clone(),
+                    command_info: &self.command_info,
                     command_output: format!("error running command {}", err),
                 };
                 return build_json_response(response);
@@ -189,7 +189,7 @@ impl RunCommandHandler {
         let response = RunCommandResponse {
             now: current_time_string(),
             command_duration_ms: command_duration.as_millis(),
-            command_info: self.command_info.clone(),
+            command_info: &self.command_info,
             command_output: combined_output,
         };
 
