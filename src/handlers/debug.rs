@@ -13,10 +13,10 @@ struct RequestInfoResponse<'a> {
     other_params: BTreeMap<&'a str, &'a str>,
 }
 
-pub(super) struct RequestInfoHandler {}
+struct RequestInfoHandler {}
 
 impl RequestInfoHandler {
-    pub(super) fn new() -> Self {
+    fn new() -> Self {
         Self {}
     }
 }
@@ -45,4 +45,15 @@ impl crate::handlers::RequestHandler for RequestInfoHandler {
 
         crate::handlers::build_json_response(response)
     }
+}
+
+pub fn create_routes() -> Vec<crate::handlers::route::Route> {
+    let mut routes = Vec::new();
+
+    routes.push(crate::handlers::route::Route::new(
+        "/cgi-bin/debug/request_info".to_string(),
+        Box::new(crate::handlers::debug::RequestInfoHandler::new()),
+    ));
+
+    routes
 }

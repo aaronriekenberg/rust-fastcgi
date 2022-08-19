@@ -4,18 +4,24 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
+use chrono::prelude::Local;
+
 use log::warn;
 
 use tokio::process::Command;
 use tokio::sync::{Semaphore, SemaphorePermit, TryAcquireError};
 
 use serde::Serialize;
-pub(super) struct AllCommandsHandler {
+
+fn current_time_string() -> String {
+    Local::now().format("%Y-%m-%d %H:%M:%S%.9f %z").to_string()
+}
+struct AllCommandsHandler {
     commands: Vec<crate::config::CommandInfo>,
 }
 
 impl AllCommandsHandler {
-    pub(super) fn new(commands: Vec<crate::config::CommandInfo>) -> Self {
+    fn new(commands: Vec<crate::config::CommandInfo>) -> Self {
         Self { commands }
     }
 }
@@ -38,13 +44,13 @@ struct RunCommandResponse<'a> {
     command_output: String,
 }
 
-pub(super) struct RunCommandHandler {
+struct RunCommandHandler {
     run_command_semaphore: Arc<Semaphore>,
     command_info: crate::config::CommandInfo,
 }
 
 impl RunCommandHandler {
-    pub(super) fn new(
+    fn new(
         run_command_semaphore: Arc<Semaphore>,
         command_info: crate::config::CommandInfo,
     ) -> Self {
@@ -66,8 +72,8 @@ impl RunCommandHandler {
         let output = match command_result {
             Err(err) => {
                 let response = RunCommandResponse {
-                    now: crate::handlers::current_time_string(),
-                    command_duration_ms: 0,
+                    now: current_time_string(),
+                    command_duration_ms: command_duration.as_millis(),
                     command_info: &self.command_info,
                     command_output: format!("error running command {}", err),
                 };
@@ -81,7 +87,7 @@ impl RunCommandHandler {
         combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
 
         let response = RunCommandResponse {
-            now: crate::handlers::current_time_string(),
+            now: current_time_string(),
             command_duration_ms: command_duration.as_millis(),
             command_info: &self.command_info,
             command_output: combined_output,
@@ -120,4 +126,39 @@ impl crate::handlers::RequestHandler for RunCommandHandler {
 
         self.handle_command_result(command_result, command_duration)
     }
+}
+
+pub fn create_routes(
+    configuration: &crate::config::Configuration,
+) -> Vec<crate::handlers::route::Route> {
+    let mut routes = Vec::new();
+
+    routes.push(crate::handlers::route::Route::new(
+        "/cgi-bin/commands".to_string(),
+        Box::new(crate::handlers::commands::AllCommandsHandler::new(
+            configuration.command_configuration().commands().clone(),
+        )),
+    ));
+
+    if configuration.command_configuration().commands().len() > 0 {
+        let run_command_semaphore = Arc::new(Semaphore::new(
+            *configuration
+                .command_configuration()
+                .max_concurrent_commands(),
+        ));
+
+        for command_info in configuration.command_configuration().commands() {
+            let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
+
+            routes.push(crate::handlers::route::Route::new(
+                expected_uri,
+                Box::new(crate::handlers::commands::RunCommandHandler::new(
+                    Arc::clone(&run_command_semaphore),
+                    command_info.clone(),
+                )),
+            ));
+        }
+    }
+
+    routes
 }
