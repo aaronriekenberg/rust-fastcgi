@@ -12,51 +12,6 @@ use tokio::{io::AsyncWrite, net::UnixListener};
 
 use tokio_fastcgi::{Request, RequestResult, Requests};
 
-/// Encodes the HTTP status code and the response string and sends it back to the webserver.
-async fn send_response<W: AsyncWrite + Unpin>(
-    request: Arc<Request<W>>,
-    response: crate::handlers::HttpResponse,
-) -> RequestResult {
-    debug!("send_response response = {:?}", response);
-
-    let mut response_string = String::new();
-
-    write!(
-        response_string,
-        "Status: {} {}\n",
-        response.status().as_u16(),
-        response.status().canonical_reason().unwrap_or("UNKNOWN")
-    )
-    .unwrap();
-
-    for (key, value) in response.headers() {
-        write!(
-            response_string,
-            "{}: {}\n",
-            key.as_str(),
-            value.to_str().unwrap_or("UNKNOWN")
-        )
-        .unwrap();
-    }
-
-    response_string.push('\n');
-
-    if let Some(data) = response.body() {
-        response_string.push_str(data);
-    }
-
-    match request.get_stdout().write(response_string.as_bytes()).await {
-        Ok(size) => {
-            debug!("request.get_stdout().write() success bytes = {}", size);
-            RequestResult::Complete(0)
-        }
-        Err(e) => {
-            warn!("request.get_stdout().write() error e = {}", e);
-            RequestResult::Complete(1)
-        }
-    }
-}
-
 fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
     connection_id: u64,
     request: &Request<W>,
@@ -75,6 +30,64 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
     };
 
     crate::handlers::FastCGIRequest::new(role, connection_id, request.get_request_id(), params)
+}
+
+// Encodes the HTTP status code and the response string and sends it back to the webserver.
+async fn send_response<W: AsyncWrite + Unpin>(
+    request: Arc<Request<W>>,
+    response: crate::handlers::HttpResponse,
+) -> RequestResult {
+    debug!("send_response response = {:?}", response);
+
+    let mut stdout = request.get_stdout();
+
+    let mut header_string = String::new();
+
+    write!(
+        header_string,
+        "Status: {} {}\n",
+        response.status().as_u16(),
+        response.status().canonical_reason().unwrap_or("UNKNOWN")
+    )
+    .unwrap();
+
+    for (key, value) in response.headers() {
+        write!(
+            header_string,
+            "{}: {}\n",
+            key.as_str(),
+            value.to_str().unwrap_or("UNKNOWN")
+        )
+        .unwrap();
+    }
+
+    header_string.push('\n');
+
+    match stdout.write(header_string.as_bytes()).await {
+        Ok(size) => {
+            debug!("stdout.write(header_string) success bytes = {}", size);
+        }
+        Err(e) => {
+            warn!("stdout.write(header_string) error e = {}", e);
+            return RequestResult::Complete(1);
+        }
+    };
+
+    drop(header_string);
+
+    if let Some(body_string) = response.body() {
+        match stdout.write(body_string.as_bytes()).await {
+            Ok(size) => {
+                debug!("stdout.write(body_string) success bytes = {}", size);
+            }
+            Err(e) => {
+                warn!("stdout.write(body_string) error e = {}", e);
+                return RequestResult::Complete(1);
+            }
+        };
+    }
+
+    RequestResult::Complete(0)
 }
 
 pub struct Server {
