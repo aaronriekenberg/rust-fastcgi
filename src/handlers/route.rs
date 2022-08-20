@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 
+use crate::handlers::utils::build_status_code_response;
+
 pub struct Route {
     expected_uri: String,
     request_handler: Box<dyn crate::handlers::RequestHandler>,
@@ -44,9 +46,9 @@ impl crate::handlers::RequestHandler for Router {
                 }
             }
 
-            crate::handlers::build_status_code_response(http::StatusCode::NOT_FOUND)
+            build_status_code_response(http::StatusCode::NOT_FOUND)
         } else {
-            crate::handlers::build_status_code_response(http::StatusCode::BAD_REQUEST)
+            build_status_code_response(http::StatusCode::BAD_REQUEST)
         }
     }
 }

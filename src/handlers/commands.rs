@@ -13,6 +13,8 @@ use tokio::sync::{Semaphore, SemaphorePermit, TryAcquireError};
 
 use serde::Serialize;
 
+use crate::handlers::utils::{build_json_response, build_status_code_response};
+
 fn current_time_string() -> String {
     Local::now().format("%Y-%m-%d %H:%M:%S%.9f %z").to_string()
 }
@@ -32,7 +34,7 @@ impl crate::handlers::RequestHandler for AllCommandsHandler {
         &self,
         _request: crate::handlers::FastCGIRequest<'_>,
     ) -> crate::handlers::HttpResponse {
-        crate::handlers::build_json_response(&self.commands)
+        build_json_response(&self.commands)
     }
 }
 
@@ -77,7 +79,7 @@ impl RunCommandHandler {
                     command_info: &self.command_info,
                     command_output: format!("error running command {}", err),
                 };
-                return crate::handlers::build_json_response(response);
+                return build_json_response(response);
             }
             Ok(output) => output,
         };
@@ -93,7 +95,7 @@ impl RunCommandHandler {
             command_output: combined_output,
         };
 
-        crate::handlers::build_json_response(response)
+        build_json_response(response)
     }
 }
 
@@ -106,7 +108,7 @@ impl crate::handlers::RequestHandler for RunCommandHandler {
         let permit = match self.acquire_run_command_semaphore() {
             Err(err) => {
                 warn!("acquire_run_command_semaphore error {}", err);
-                return crate::handlers::build_status_code_response(
+                return build_status_code_response(
                     http::StatusCode::TOO_MANY_REQUESTS,
                 );
             }

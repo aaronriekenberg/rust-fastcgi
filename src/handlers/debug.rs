@@ -4,6 +4,8 @@ use async_trait::async_trait;
 
 use serde::Serialize;
 
+use crate::handlers::utils::build_json_response;
+
 #[derive(Debug, Default, Serialize)]
 struct RequestInfoResponse<'a> {
     role: &'static str,
@@ -58,7 +60,7 @@ impl crate::handlers::RequestHandler for RequestInfoHandler {
             }
         }
 
-        crate::handlers::build_json_response(response)
+        build_json_response(response)
     }
 }
 
