@@ -8,7 +8,7 @@ use crate::handlers::utils::build_json_response;
 
 #[derive(Debug, Default, Serialize)]
 struct RequestInfoResponse<'a> {
-    role: &'static str,
+    role: &'a str,
     connection_id: u64,
     request_id: u16,
     http_headers: BTreeMap<&'a str, &'a str>,

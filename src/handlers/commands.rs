@@ -108,9 +108,7 @@ impl crate::handlers::RequestHandler for RunCommandHandler {
         let permit = match self.acquire_run_command_semaphore() {
             Err(err) => {
                 warn!("acquire_run_command_semaphore error {}", err);
-                return build_status_code_response(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                );
+                return build_status_code_response(http::StatusCode::TOO_MANY_REQUESTS);
             }
             Ok(permit) => permit,
         };

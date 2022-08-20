@@ -13,24 +13,31 @@ use getset::Getters;
 #[derive(Debug, Getters)]
 #[getset(get = "pub")]
 pub struct FastCGIRequest<'a> {
-    role: &'static str,
+    role: &'a str,
     connection_id: u64,
     request_id: u16,
     params: HashMap<&'a str, &'a str>,
+    request_uri: Option<&'a str>,
 }
 
 impl<'a> FastCGIRequest<'a> {
     pub fn new(
-        role: &'static str,
+        role: &'a str,
         connection_id: u64,
         request_id: u16,
         params: HashMap<&'a str, &'a str>,
     ) -> Self {
+        let request_uri = match params.get("request_uri") {
+            Some(request_uri) => Some(*request_uri),
+            None => None,
+        };
+
         Self {
             role,
             connection_id,
             request_id,
             params,
+            request_uri,
         }
     }
 }
