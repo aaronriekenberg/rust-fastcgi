@@ -13,6 +13,7 @@ use tokio::sync::{Semaphore, SemaphorePermit, TryAcquireError};
 
 use serde::Serialize;
 
+use crate::handlers::route::URIAndHandler;
 use crate::handlers::utils::{build_json_response, build_status_code_response};
 
 fn current_time_string() -> String {
@@ -128,14 +129,12 @@ impl crate::handlers::RequestHandler for RunCommandHandler {
     }
 }
 
-pub fn create_routes(
-    configuration: &crate::config::Configuration,
-) -> Vec<crate::handlers::route::Route> {
-    let mut routes = Vec::new();
+pub fn create_routes(configuration: &crate::config::Configuration) -> Vec<URIAndHandler> {
+    let mut routes: Vec<URIAndHandler> = Vec::new();
 
-    routes.push(crate::handlers::route::Route::new(
+    routes.push((
         "/cgi-bin/commands".to_string(),
-        Box::new(crate::handlers::commands::AllCommandsHandler::new(
+        Box::new(AllCommandsHandler::new(
             configuration.command_configuration().commands().clone(),
         )),
     ));
@@ -150,9 +149,9 @@ pub fn create_routes(
         for command_info in configuration.command_configuration().commands() {
             let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
 
-            routes.push(crate::handlers::route::Route::new(
+            routes.push((
                 expected_uri,
-                Box::new(crate::handlers::commands::RunCommandHandler::new(
+                Box::new(RunCommandHandler::new(
                     Arc::clone(&run_command_semaphore),
                     command_info.clone(),
                 )),

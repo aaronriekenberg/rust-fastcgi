@@ -4,36 +4,23 @@ use async_trait::async_trait;
 
 use crate::handlers::utils::build_status_code_response;
 
-pub struct Route {
-    expected_uri: String,
-    request_handler: Box<dyn crate::handlers::RequestHandler>,
-}
+pub type Handler = dyn crate::handlers::RequestHandler;
 
-impl Route {
-    pub fn new(
-        expected_uri: String,
-        request_handler: Box<dyn crate::handlers::RequestHandler>,
-    ) -> Self {
-        Self {
-            expected_uri,
-            request_handler,
-        }
-    }
-}
+pub type URIAndHandler = (String, Box<Handler>);
 
 pub struct Router {
-    uri_to_request_handler: HashMap<String, Box<dyn crate::handlers::RequestHandler>>,
+    uri_to_request_handler: HashMap<String, Box<Handler>>,
 }
 
 impl Router {
-    pub fn new(routes: Vec<Route>) -> Self {
+    pub fn new(routes: Vec<URIAndHandler>) -> Self {
         let mut router = Self {
             uri_to_request_handler: HashMap::new(),
         };
-        for route in routes {
+        for (uri, handler) in routes {
             router
                 .uri_to_request_handler
-                .insert(route.expected_uri, route.request_handler);
+                .insert(uri, handler);
         }
         router
     }

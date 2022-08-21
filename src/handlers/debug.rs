@@ -4,6 +4,7 @@ use async_trait::async_trait;
 
 use serde::Serialize;
 
+use crate::handlers::route::URIAndHandler;
 use crate::handlers::utils::build_json_response;
 
 #[derive(Debug, Default, Serialize)]
@@ -66,12 +67,12 @@ impl crate::handlers::RequestHandler for RequestInfoHandler {
     }
 }
 
-pub fn create_routes() -> Vec<crate::handlers::route::Route> {
-    let mut routes = Vec::new();
+pub fn create_routes() -> Vec<URIAndHandler> {
+    let mut routes: Vec<URIAndHandler> = Vec::new();
 
-    routes.push(crate::handlers::route::Route::new(
+    routes.push((
         "/cgi-bin/debug/request_info".to_string(),
-        Box::new(crate::handlers::debug::RequestInfoHandler::new()),
+        Box::new(RequestInfoHandler::new()),
     ));
 
     routes
