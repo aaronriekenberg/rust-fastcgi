@@ -22,14 +22,22 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
         tokio_fastcgi::Role::Responder => "Responder",
     };
 
-    let params: HashMap<&str, &str> = match request.str_params_iter() {
+    let mut params: HashMap<&str, &str> = match request.str_params_iter() {
         Some(iter) => iter
             .map(|v| (v.0, v.1.unwrap_or("[Invalid UTF8]")))
             .collect(),
         None => HashMap::new(),
     };
 
-    crate::handlers::FastCGIRequest::new(role, connection_id, request.get_request_id(), params)
+    let request_uri = params.remove("request_uri");
+
+    crate::handlers::FastCGIRequest::new(
+        role,
+        connection_id,
+        request.get_request_id(),
+        params,
+        request_uri,
+    )
 }
 
 // Encodes the HTTP status code and the response string and sends it back to the webserver.

@@ -16,8 +16,8 @@ pub struct FastCGIRequest<'a> {
     role: &'a str,
     connection_id: u64,
     request_id: u16,
-    params: HashMap<&'a str, &'a str>,
     request_uri: Option<&'a str>,
+    params: HashMap<&'a str, &'a str>,
 }
 
 impl<'a> FastCGIRequest<'a> {
@@ -26,18 +26,14 @@ impl<'a> FastCGIRequest<'a> {
         connection_id: u64,
         request_id: u16,
         params: HashMap<&'a str, &'a str>,
+        request_uri: Option<&'a str>,
     ) -> Self {
-        let request_uri = match params.get("request_uri") {
-            Some(request_uri) => Some(*request_uri),
-            None => None,
-        };
-
         Self {
             role,
             connection_id,
             request_id,
-            params,
             request_uri,
+            params,
         }
     }
 }
