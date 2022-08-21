@@ -3,7 +3,6 @@ mod debug;
 mod route;
 mod utils;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -17,7 +16,7 @@ pub struct FastCGIRequest<'a> {
     connection_id: u64,
     request_id: u16,
     request_uri: Option<&'a str>,
-    params: HashMap<&'a str, &'a str>,
+    params: Vec<(&'a str, &'a str)>,
 }
 
 impl<'a> FastCGIRequest<'a> {
@@ -25,7 +24,7 @@ impl<'a> FastCGIRequest<'a> {
         role: &'a str,
         connection_id: u64,
         request_id: u16,
-        params: HashMap<&'a str, &'a str>,
+        params: Vec<(&'a str, &'a str)>,
         request_uri: Option<&'a str>,
     ) -> Self {
         Self {

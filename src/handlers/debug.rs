@@ -48,7 +48,7 @@ impl crate::handlers::RequestHandler for RequestInfoHandler {
             role: request.role(),
             connection_id: *request.connection_id(),
             request_id: *request.request_id(),
-            request_uri: request.request_uri().unwrap_or("UNKNOWN"),
+            request_uri: request.request_uri().unwrap_or("[Unknown URI]"),
             ..Default::default()
         };
 
