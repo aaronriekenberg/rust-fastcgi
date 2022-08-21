@@ -44,7 +44,7 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
 async fn send_response<W: AsyncWrite + Unpin>(
     request: Arc<Request<W>>,
     response: crate::handlers::HttpResponse,
-) -> RequestResult {
+) -> Result<(), tokio_fastcgi::Error> {
     debug!("send_response response = {:?}", response);
 
     let mut stdout = request.get_stdout();
@@ -55,7 +55,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
         header_string,
         "Status: {} {}\n",
         response.status().as_u16(),
-        response.status().canonical_reason().unwrap_or("UNKNOWN")
+        response.status().canonical_reason().unwrap_or("[Unknown]")
     )
     .unwrap();
 
@@ -64,38 +64,32 @@ async fn send_response<W: AsyncWrite + Unpin>(
             header_string,
             "{}: {}\n",
             key.as_str(),
-            value.to_str().unwrap_or("UNKNOWN")
+            value.to_str().unwrap_or("[Unknown]")
         )
         .unwrap();
     }
 
     header_string.push('\n');
 
-    match stdout.write(header_string.as_bytes()).await {
-        Ok(size) => {
-            debug!("stdout.write(header_string) success bytes = {}", size);
-        }
-        Err(e) => {
-            warn!("stdout.write(header_string) error e = {}", e);
-            return RequestResult::Complete(1);
-        }
-    };
+    stdout.write(header_string.as_bytes()).await?;
 
     drop(header_string);
 
     if let Some(body_string) = response.body() {
-        match stdout.write(body_string.as_bytes()).await {
-            Ok(size) => {
-                debug!("stdout.write(body_string) success bytes = {}", size);
-            }
-            Err(e) => {
-                warn!("stdout.write(body_string) error e = {}", e);
-                return RequestResult::Complete(1);
-            }
-        };
+        stdout.write(body_string.as_bytes()).await?;
     }
 
-    RequestResult::Complete(0)
+    Ok(())
+}
+
+fn map_send_response_error(result: Result<(), impl Error>) -> RequestResult {
+    match result {
+        Ok(_) => RequestResult::Complete(0),
+        Err(err) => {
+            warn!("Send response failed: {}", err);
+            RequestResult::Complete(1)
+        }
+    }
 }
 
 pub struct Server {
@@ -167,7 +161,7 @@ impl Server {
 
                         let response = request_handlers.handle(fastcgi_request).await;
 
-                        send_response(request, response).await
+                        map_send_response_error(send_response(request, response).await)
                     })
                     .await
                 {
