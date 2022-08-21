@@ -35,8 +35,8 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
         role,
         connection_id,
         request.get_request_id(),
-        params,
         request_uri,
+        params,
     )
 }
 

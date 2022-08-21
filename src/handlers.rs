@@ -24,8 +24,8 @@ impl<'a> FastCGIRequest<'a> {
         role: &'a str,
         connection_id: u64,
         request_id: u16,
-        params: Vec<(&'a str, &'a str)>,
         request_uri: Option<&'a str>,
+        params: Vec<(&'a str, &'a str)>,
     ) -> Self {
         Self {
             role,
