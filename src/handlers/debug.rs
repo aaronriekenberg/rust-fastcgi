@@ -25,19 +25,6 @@ impl RequestInfoHandler {
     }
 }
 
-const HTTP_HEADER_PREFIX: &'static str = "http_";
-const HTTP_HEADER_LEN: usize = HTTP_HEADER_PREFIX.len();
-
-fn decode_http_header_key(key: &str) -> Option<&str> {
-    if (key.len() >= HTTP_HEADER_LEN)
-        && (HTTP_HEADER_PREFIX.eq_ignore_ascii_case(&key[..HTTP_HEADER_LEN]))
-    {
-        Some(&key[HTTP_HEADER_LEN..])
-    } else {
-        None
-    }
-}
-
 #[async_trait]
 impl crate::handlers::RequestHandler for RequestInfoHandler {
     async fn handle(
@@ -53,13 +40,11 @@ impl crate::handlers::RequestHandler for RequestInfoHandler {
         };
 
         for (key, value) in request.params().iter() {
-            match decode_http_header_key(key) {
-                Some(http_header_key) => {
-                    response.http_headers.insert(http_header_key, value);
-                }
-                None => {
-                    response.other_params.insert(key, value);
-                }
+            if key.starts_with("http_") {
+                let http_header_key = &key[5..];
+                response.http_headers.insert(http_header_key, value);
+            } else {
+                response.other_params.insert(key, value);
             }
         }
 
