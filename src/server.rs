@@ -66,7 +66,7 @@ impl Server {
 
                 if let Err(err) = request
                     .process(|request| async move {
-                        let fastcgi_request = FastCGIRequest::from(&*request);
+                        let fastcgi_request = FastCGIRequest::from(request.as_ref());
 
                         let response = request_handlers.handle(fastcgi_request).await;
 
