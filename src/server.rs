@@ -44,7 +44,7 @@ fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
 async fn send_response<W: AsyncWrite + Unpin>(
     request: Arc<Request<W>>,
     response: crate::handlers::HttpResponse,
-) -> Result<(), tokio_fastcgi::Error> {
+) -> Result<(), Box<dyn Error>> {
     debug!("send_response response = {:?}", response);
 
     let mut stdout = request.get_stdout();
@@ -56,8 +56,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
         "Status: {} {}\n",
         response.status().as_u16(),
         response.status().canonical_reason().unwrap_or("[Unknown]")
-    )
-    .unwrap();
+    )?;
 
     for (key, value) in response.headers() {
         write!(
@@ -65,8 +64,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
             "{}: {}\n",
             key.as_str(),
             value.to_str().unwrap_or("[Unknown]")
-        )
-        .unwrap();
+        )?;
     }
 
     header_string.push('\n');
@@ -82,7 +80,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
     Ok(())
 }
 
-fn map_send_response_result(result: Result<(), impl Error>) -> RequestResult {
+fn map_send_response_result(result: Result<(), Box<dyn Error>>) -> RequestResult {
     match result {
         Ok(_) => RequestResult::Complete(0),
         Err(err) => {
