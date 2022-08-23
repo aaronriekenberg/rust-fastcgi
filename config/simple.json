@@ -1,0 +1,27 @@
+{
+    "server_configuration": {
+        "socket_path": "./socket",
+        "max_concurrent_connections": 10,
+        "max_requests_per_connection": 10
+    },
+    "command_configuration": {
+        "max_concurrent_commands": 10,
+        "commands": [
+            {
+                "id": "uptime",
+                "description": "uptime",
+                "command": "/usr/bin/uptime"
+            },
+            {
+                "id": "vmstat",
+                "description": "vmstat",
+                "command": "/usr/bin/vmstat"
+            },
+            {
+                "id": "w",
+                "description": "w",
+                "command": "/usr/bin/w"
+            }
+        ]
+    }
+}

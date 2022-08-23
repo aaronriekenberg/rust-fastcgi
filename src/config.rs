@@ -41,9 +41,7 @@ pub struct Configuration {
     command_configuration: CommandConfiguration,
 }
 
-pub async fn read_configuration(
-    config_file: &str,
-) -> Result<Configuration, Box<dyn Error>> {
+pub async fn read_configuration(config_file: String) -> Result<Configuration, Box<dyn Error>> {
     info!("reading {}", config_file);
 
     let mut file = File::open(config_file).await?;

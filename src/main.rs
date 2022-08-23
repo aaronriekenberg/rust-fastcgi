@@ -8,7 +8,11 @@ use std::error::Error;
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::builder().format_timestamp_nanos().init();
 
-    let configuration = config::read_configuration("config.json").await?;
+    let config_file = std::env::args()
+        .nth(1)
+        .ok_or("config file required as command line argument")?;
+
+    let configuration = config::read_configuration(config_file).await?;
 
     let server = crate::server::Server::new(configuration);
     server.run().await?;
