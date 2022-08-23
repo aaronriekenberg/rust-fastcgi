@@ -14,9 +14,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .nth(1)
         .ok_or("config file required as command line argument")?;
 
-    let configuration = config::read_configuration(config_file).await?;
+    let configuration = crate::config::read_configuration(config_file).await?;
 
-    let server = crate::server::Server::new(configuration);
+    let handlers = crate::handlers::create_handlers(&configuration);
+
+    let server = crate::server::Server::new(handlers, configuration.server_configuration());
     server.run().await?;
 
     Ok(())

@@ -18,11 +18,12 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(configuration: crate::config::Configuration) -> Self {
-        let handlers = crate::handlers::create_handlers(&configuration);
-
+    pub fn new(
+        handlers: Arc<dyn crate::handlers::RequestHandler>,
+        server_configuration: &crate::config::ServerConfiguration,
+    ) -> Self {
         Self {
-            server_configuration: configuration.server_configuration().clone(),
+            server_configuration: server_configuration.clone(),
             handlers,
         }
     }
