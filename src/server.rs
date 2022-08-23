@@ -82,7 +82,7 @@ async fn send_response<W: AsyncWrite + Unpin>(
     Ok(())
 }
 
-fn map_send_response_error(result: Result<(), impl Error>) -> RequestResult {
+fn map_send_response_result(result: Result<(), impl Error>) -> RequestResult {
     match result {
         Ok(_) => RequestResult::Complete(0),
         Err(err) => {
@@ -161,7 +161,7 @@ impl Server {
 
                         let response = request_handlers.handle(fastcgi_request).await;
 
-                        map_send_response_error(send_response(request, response).await)
+                        map_send_response_result(send_response(request, response).await)
                     })
                     .await
                 {

@@ -3,13 +3,12 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 
 use crate::handlers::utils::build_status_code_response;
+use crate::handlers::RequestHandler;
 
-pub type Handler = dyn crate::handlers::RequestHandler;
-
-pub type URIAndHandler = (String, Box<Handler>);
+pub type URIAndHandler = (String, Box<dyn RequestHandler>);
 
 pub struct Router {
-    uri_to_request_handler: HashMap<String, Box<Handler>>,
+    uri_to_request_handler: HashMap<String, Box<dyn RequestHandler>>,
 }
 
 impl Router {
@@ -18,9 +17,7 @@ impl Router {
             uri_to_request_handler: HashMap::new(),
         };
         for (uri, handler) in routes {
-            router
-                .uri_to_request_handler
-                .insert(uri, handler);
+            router.uri_to_request_handler.insert(uri, handler);
         }
         router
     }
