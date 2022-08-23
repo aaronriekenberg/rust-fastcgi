@@ -19,6 +19,7 @@ use crate::handlers::utils::{build_json_response, build_status_code_response};
 fn current_time_string() -> String {
     Local::now().format("%Y-%m-%d %H:%M:%S%.9f %z").to_string()
 }
+
 struct AllCommandsHandler {
     commands: Vec<crate::config::CommandInfo>,
 }
