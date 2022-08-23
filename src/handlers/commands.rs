@@ -136,24 +136,24 @@ impl crate::handlers::RequestHandler for RunCommandHandler {
     }
 }
 
-pub fn create_routes(configuration: &crate::config::Configuration) -> Vec<URIAndHandler> {
+pub fn create_routes(
+    command_configuration: &crate::config::CommandConfiguration,
+) -> Vec<URIAndHandler> {
     let mut routes: Vec<URIAndHandler> = Vec::new();
 
     routes.push((
         "/cgi-bin/commands".to_string(),
         Box::new(AllCommandsHandler::new(
-            configuration.command_configuration().commands().clone(),
+            command_configuration.commands().clone(),
         )),
     ));
 
-    if configuration.command_configuration().commands().len() > 0 {
+    if command_configuration.commands().len() > 0 {
         let run_command_semaphore = Arc::new(Semaphore::new(
-            *configuration
-                .command_configuration()
-                .max_concurrent_commands(),
+            *command_configuration.max_concurrent_commands(),
         ));
 
-        for command_info in configuration.command_configuration().commands() {
+        for command_info in command_configuration.commands() {
             let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
 
             routes.push((

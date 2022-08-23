@@ -21,7 +21,9 @@ pub fn create_handlers(
 ) -> Result<Arc<dyn RequestHandler>, Box<dyn Error>> {
     let mut routes = Vec::new();
 
-    routes.append(&mut commands::create_routes(configuration));
+    routes.append(&mut commands::create_routes(
+        configuration.command_configuration(),
+    ));
 
     routes.append(&mut debug::create_routes());
 
