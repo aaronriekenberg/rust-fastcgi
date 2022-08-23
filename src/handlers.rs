@@ -50,9 +50,9 @@ pub trait RequestHandler: Send + Sync {
 pub fn create_handlers(configuration: &crate::config::Configuration) -> Arc<dyn RequestHandler> {
     let mut routes = Vec::new();
 
-    routes.append(&mut debug::create_routes());
-
     routes.append(&mut commands::create_routes(configuration));
+
+    routes.append(&mut debug::create_routes());
 
     Arc::new(route::Router::new(routes))
 }
