@@ -13,22 +13,6 @@ pub struct FastCGIRequest<'a> {
     params: Vec<ParamKeyValue<'a>>,
 }
 
-impl<'a> FastCGIRequest<'a> {
-    fn new(
-        role: &'a str,
-        request_id: u16,
-        request_uri: Option<&'a str>,
-        params: Vec<ParamKeyValue<'a>>,
-    ) -> Self {
-        Self {
-            role,
-            request_id,
-            request_uri,
-            params,
-        }
-    }
-}
-
 impl<'a, W: AsyncWrite + Unpin> From<&'a tokio_fastcgi::Request<W>> for FastCGIRequest<'a> {
     fn from(request: &'a tokio_fastcgi::Request<W>) -> FastCGIRequest<'a> {
         let role = match request.role {
@@ -47,6 +31,11 @@ impl<'a, W: AsyncWrite + Unpin> From<&'a tokio_fastcgi::Request<W>> for FastCGIR
             None => Vec::new(),
         };
 
-        FastCGIRequest::new(role, request.get_request_id(), request_uri, params)
+        FastCGIRequest {
+            role,
+            request_id: request.get_request_id(),
+            request_uri,
+            params,
+        }
     }
 }
