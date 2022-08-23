@@ -5,7 +5,7 @@ AssertPathExists=%h/rust-fastcgi/target/release/rust-fastcgi
 
 [Service]
 WorkingDirectory=%h/rust-fastcgi
-ExecStart=%h/rust-fastcgi/target/release/rust-fastcgi
+ExecStart=%h/rust-fastcgi/target/release/rust-fastcgi ./config/config.json
 Restart=always
 Environment=RUST_LOG=info
 UMask=007
