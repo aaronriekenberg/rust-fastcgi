@@ -1,97 +1,18 @@
 use std::error::Error;
-use std::fmt::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use log::{debug, error, info, warn};
 
 use tokio::net::unix::SocketAddr;
+use tokio::net::UnixListener;
 use tokio::net::UnixStream;
-use tokio::{io::AsyncWrite, net::UnixListener};
 
-use tokio_fastcgi::{Request, RequestResult, Requests};
+use tokio_fastcgi::Requests;
 
-fn request_to_fastcgi_request<W: AsyncWrite + Unpin>(
-    connection_id: u64,
-    request: &Request<W>,
-) -> crate::handlers::FastCGIRequest<'_> {
-    let role = match request.role {
-        tokio_fastcgi::Role::Authorizer => "Authorizer",
-        tokio_fastcgi::Role::Filter => "Filter",
-        tokio_fastcgi::Role::Responder => "Responder",
-    };
-
-    let request_uri = request.get_str_param("request_uri");
-
-    let params: Vec<(&str, &str)> = match request.str_params_iter() {
-        Some(iter) => iter
-            .filter(|v| v.0 != "request_uri")
-            .map(|v| (v.0, v.1.unwrap_or("[Invalid UTF8]")))
-            .collect(),
-        None => Vec::new(),
-    };
-
-    crate::handlers::FastCGIRequest::new(
-        role,
-        connection_id,
-        request.get_request_id(),
-        request_uri,
-        params,
-    )
-}
-
-// Encodes the HTTP status code and the response string and sends it back to the webserver.
-async fn send_response<W: AsyncWrite + Unpin>(
-    request: Arc<Request<W>>,
-    response: crate::handlers::HttpResponse,
-) -> Result<(), Box<dyn Error>> {
-    debug!("send_response response = {:?}", response);
-
-    let mut stdout = request.get_stdout();
-
-    let mut header_string = String::new();
-
-    write!(
-        header_string,
-        "Status: {} {}\n",
-        response.status().as_u16(),
-        response.status().canonical_reason().unwrap_or("[Unknown]")
-    )?;
-
-    for (key, value) in response.headers() {
-        write!(
-            header_string,
-            "{}: {}\n",
-            key.as_str(),
-            value.to_str().unwrap_or("[Unknown]")
-        )?;
-    }
-
-    header_string.push('\n');
-
-    stdout.write(header_string.as_bytes()).await?;
-
-    drop(header_string);
-
-    if let Some(body_string) = response.body() {
-        stdout.write(body_string.as_bytes()).await?;
-    }
-
-    Ok(())
-}
-
-fn map_send_response_result(result: Result<(), Box<dyn Error>>) -> RequestResult {
-    match result {
-        Ok(_) => RequestResult::Complete(0),
-        Err(err) => {
-            warn!("Send response failed: {}", err);
-            RequestResult::Complete(1)
-        }
-    }
-}
+use crate::request::FastCGIRequest;
+use crate::response::send_response;
 
 pub struct Server {
-    connection_counter: AtomicU64,
     server_configuration: crate::config::ServerConfiguration,
     handlers: Arc<dyn crate::handlers::RequestHandler>,
 }
@@ -101,7 +22,6 @@ impl Server {
         let handlers = crate::handlers::create_handlers(&configuration);
 
         Self {
-            connection_counter: AtomicU64::new(0),
             server_configuration: configuration.server_configuration().clone(),
             handlers,
         }
@@ -121,17 +41,8 @@ impl Server {
         Ok(listener)
     }
 
-    fn next_connection_id(&self) -> u64 {
-        self.connection_counter.fetch_add(1, Ordering::Relaxed)
-    }
-
     fn handle_connection(&self, stream: UnixStream, address: SocketAddr) {
-        let connection_id = self.next_connection_id();
-
-        debug!(
-            "Connection from {:?} connection_id = {}",
-            address, connection_id
-        );
+        debug!("Connection from {:?}", address);
 
         let conn_handlers = Arc::clone(&self.handlers);
 
@@ -155,11 +66,11 @@ impl Server {
 
                 if let Err(err) = request
                     .process(|request| async move {
-                        let fastcgi_request = request_to_fastcgi_request(connection_id, &request);
+                        let fastcgi_request = FastCGIRequest::from(&*request);
 
                         let response = request_handlers.handle(fastcgi_request).await;
 
-                        map_send_response_result(send_response(request, response).await)
+                        send_response(request, response).await
                     })
                     .await
                 {

@@ -7,40 +7,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use getset::Getters;
-
-pub type ParamKeyValue<'a> = (&'a str, &'a str);
-
-#[derive(Debug, Getters)]
-#[getset(get = "pub")]
-
-pub struct FastCGIRequest<'a> {
-    role: &'a str,
-    connection_id: u64,
-    request_id: u16,
-    request_uri: Option<&'a str>,
-    params: Vec<ParamKeyValue<'a>>,
-}
-
-impl<'a> FastCGIRequest<'a> {
-    pub fn new(
-        role: &'a str,
-        connection_id: u64,
-        request_id: u16,
-        request_uri: Option<&'a str>,
-        params: Vec<ParamKeyValue<'a>>,
-    ) -> Self {
-        Self {
-            role,
-            connection_id,
-            request_id,
-            request_uri,
-            params,
-        }
-    }
-}
-
-pub type HttpResponse = http::Response<Option<String>>;
+use crate::request::FastCGIRequest;
+use crate::response::HttpResponse;
 
 #[async_trait]
 pub trait RequestHandler: Send + Sync {

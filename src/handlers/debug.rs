@@ -10,7 +10,6 @@ use crate::handlers::utils::build_json_response;
 #[derive(Debug, Default, Serialize)]
 struct RequestInfoResponse<'a> {
     role: &'a str,
-    connection_id: u64,
     request_id: u16,
     request_uri: &'a str,
     http_headers: BTreeMap<&'a str, &'a str>,
@@ -33,7 +32,6 @@ impl crate::handlers::RequestHandler for RequestInfoHandler {
     ) -> crate::handlers::HttpResponse {
         let mut response = RequestInfoResponse {
             role: request.role(),
-            connection_id: *request.connection_id(),
             request_id: *request.request_id(),
             request_uri: request.request_uri().unwrap_or("[Unknown URI]"),
             ..Default::default()
