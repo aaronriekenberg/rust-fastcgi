@@ -67,22 +67,37 @@ impl RunCommandHandler {
         self.run_command_semaphore.try_acquire()
     }
 
+    async fn run_command(
+        &self,
+        _permit: SemaphorePermit<'_>,
+    ) -> Result<(Output, Duration), std::io::Error> {
+        let command_start_time = Instant::now();
+
+        let output = Command::new(self.command_info.command())
+            .args(self.command_info.args())
+            .output()
+            .await?;
+
+        let duration = Instant::now() - command_start_time;
+
+        Ok((output, duration))
+    }
+
     fn handle_command_result(
         &self,
-        command_result: Result<Output, std::io::Error>,
-        command_duration: Duration,
+        command_result: Result<(Output, Duration), std::io::Error>,
     ) -> crate::handlers::HttpResponse {
-        let output = match command_result {
+        let (output, command_duration) = match command_result {
             Err(err) => {
                 let response = RunCommandResponse {
                     now: current_time_string(),
-                    command_duration_ms: command_duration.as_millis(),
+                    command_duration_ms: 0,
                     command_info: &self.command_info,
                     command_output: format!("error running command {}", err),
                 };
                 return build_json_response(response);
             }
-            Ok(output) => output,
+            Ok(result) => result,
         };
 
         let mut combined_output = String::with_capacity(output.stderr.len() + output.stdout.len());
@@ -114,18 +129,9 @@ impl crate::handlers::RequestHandler for RunCommandHandler {
             Ok(permit) => permit,
         };
 
-        let command_start_time = Instant::now();
+        let result = self.run_command(permit).await;
 
-        let command_result = Command::new(self.command_info.command())
-            .args(self.command_info.args())
-            .output()
-            .await;
-
-        let command_duration = Instant::now() - command_start_time;
-
-        drop(permit);
-
-        self.handle_command_result(command_result, command_duration)
+        self.handle_command_result(result)
     }
 }
 
