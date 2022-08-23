@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let configuration = crate::config::read_configuration(config_file).await?;
 
-    let handlers = crate::handlers::create_handlers(&configuration);
+    let handlers = crate::handlers::create_handlers(&configuration)?;
 
     let server = crate::server::Server::new(handlers, configuration.server_configuration());
     server.run().await?;
