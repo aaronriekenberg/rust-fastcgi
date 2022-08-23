@@ -10,14 +10,7 @@ use tokio_fastcgi::{Request, RequestResult};
 
 pub type HttpResponse = http::Response<Option<String>>;
 
-async fn internal_send_response<W: AsyncWrite + Unpin>(
-    request: Arc<Request<W>>,
-    response: HttpResponse,
-) -> Result<(), Box<dyn Error>> {
-    debug!("send_response response = {:?}", response);
-
-    let mut stdout = request.get_stdout();
-
+fn build_header_string(response: &HttpResponse) -> Result<String, Box<dyn Error>> {
     let mut header_string = String::new();
 
     write!(
@@ -38,9 +31,20 @@ async fn internal_send_response<W: AsyncWrite + Unpin>(
 
     header_string.push('\n');
 
-    stdout.write(header_string.as_bytes()).await?;
+    Ok(header_string)
+}
 
-    drop(header_string);
+async fn internal_send_response<W: AsyncWrite + Unpin>(
+    request: Arc<Request<W>>,
+    response: HttpResponse,
+) -> Result<(), Box<dyn Error>> {
+    debug!("send_response response = {:?}", response);
+
+    let mut stdout = request.get_stdout();
+
+    let header_string = build_header_string(&response)?;
+
+    stdout.write(header_string.as_bytes()).await?;
 
     if let Some(body_string) = response.body() {
         stdout.write(body_string.as_bytes()).await?;
