@@ -39,13 +39,12 @@ impl crate::handlers::RequestHandler for Router {
         &self,
         request: crate::handlers::FastCGIRequest<'_>,
     ) -> crate::handlers::HttpResponse {
-        if let Some(request_uri) = request.request_uri() {
-            match self.uri_to_request_handler.get(*request_uri) {
+        match request.request_uri() {
+            None => build_status_code_response(http::StatusCode::BAD_REQUEST),
+            Some(request_uri) => match self.uri_to_request_handler.get(*request_uri) {
                 Some(handler) => handler.handle(request).await,
                 None => build_status_code_response(http::StatusCode::NOT_FOUND),
-            }
-        } else {
-            build_status_code_response(http::StatusCode::BAD_REQUEST)
+            },
         }
     }
 }
