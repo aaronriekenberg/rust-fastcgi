@@ -4,7 +4,7 @@ use log::{debug, warn};
 
 use tokio::io::AsyncWrite;
 
-use tokio_fastcgi::{Request, RequestResult};
+use tokio_fastcgi::{OutStream, Request, RequestResult};
 
 pub type HttpResponse = http::Response<Option<String>>;
 
@@ -32,6 +32,15 @@ fn build_header_string(response: &HttpResponse) -> Result<String, Box<dyn Error>
     Ok(header_string)
 }
 
+async fn write_to_stdout<W: AsyncWrite + Unpin>(
+    stdout: &mut OutStream<W>,
+    data: String,
+) -> Result<(), Box<dyn Error>> {
+    stdout.write(data.as_bytes()).await?;
+
+    Ok(())
+}
+
 async fn internal_send_response<W: AsyncWrite + Unpin>(
     request: Arc<Request<W>>,
     response: HttpResponse,
@@ -42,10 +51,10 @@ async fn internal_send_response<W: AsyncWrite + Unpin>(
 
     let header_string = build_header_string(&response)?;
 
-    stdout.write(header_string.as_bytes()).await?;
+    write_to_stdout(&mut stdout, header_string).await?;
 
-    if let Some(body_string) = response.body() {
-        stdout.write(body_string.as_bytes()).await?;
+    if let Some(body_string) = response.into_body() {
+        write_to_stdout(&mut stdout, body_string).await?;
     }
 
     Ok(())
