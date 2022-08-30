@@ -9,16 +9,16 @@ use tokio::net::{
 
 use tokio_fastcgi::Requests;
 
-use crate::{request::FastCGIRequest, response::send_response};
+use crate::{handlers::RequestHandler, request::FastCGIRequest, response::send_response};
 
 pub struct Server {
     server_configuration: crate::config::ServerConfiguration,
-    handlers: Arc<dyn crate::handlers::RequestHandler>,
+    handlers: Arc<dyn RequestHandler>,
 }
 
 impl Server {
     pub fn new(
-        handlers: Arc<dyn crate::handlers::RequestHandler>,
+        handlers: Arc<dyn RequestHandler>,
         server_configuration: &crate::config::ServerConfiguration,
     ) -> Self {
         Self {
