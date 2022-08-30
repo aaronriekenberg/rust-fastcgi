@@ -6,8 +6,10 @@ use log::info;
 
 use serde::{Deserialize, Serialize};
 
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::{
+    fs::File,
+    io::AsyncReadExt,
+};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]

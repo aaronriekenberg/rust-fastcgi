@@ -1,6 +1,4 @@
-use std::error::Error;
-use std::fmt::Write;
-use std::sync::Arc;
+use std::{error::Error, fmt::Write, sync::Arc};
 
 use log::{debug, warn};
 

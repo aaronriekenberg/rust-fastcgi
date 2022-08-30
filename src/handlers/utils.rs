@@ -2,7 +2,9 @@ use log::warn;
 
 use serde::Serialize;
 
-pub fn build_json_response(response_dto: impl Serialize) -> crate::handlers::HttpResponse {
+use crate::response::HttpResponse;
+
+pub fn build_json_response(response_dto: impl Serialize) -> HttpResponse {
     let json_result = serde_json::to_string(&response_dto);
 
     match json_result {
@@ -22,7 +24,7 @@ pub fn build_json_response(response_dto: impl Serialize) -> crate::handlers::Htt
     }
 }
 
-pub fn build_status_code_response(status_code: http::StatusCode) -> crate::handlers::HttpResponse {
+pub fn build_status_code_response(status_code: http::StatusCode) -> HttpResponse {
     http::Response::builder()
         .status(status_code)
         .body(None)

@@ -4,8 +4,11 @@ use async_trait::async_trait;
 
 use serde::Serialize;
 
-use crate::handlers::route::URIAndHandler;
-use crate::handlers::utils::build_json_response;
+use crate::handlers::{
+    route::URIAndHandler,
+    utils::build_json_response,
+    {FastCGIRequest, HttpResponse, RequestHandler},
+};
 
 #[derive(Debug, Default, Serialize)]
 struct RequestInfoResponse<'a> {
@@ -25,11 +28,8 @@ impl RequestInfoHandler {
 }
 
 #[async_trait]
-impl crate::handlers::RequestHandler for RequestInfoHandler {
-    async fn handle(
-        &self,
-        request: crate::handlers::FastCGIRequest<'_>,
-    ) -> crate::handlers::HttpResponse {
+impl RequestHandler for RequestInfoHandler {
+    async fn handle(&self, request: FastCGIRequest<'_>) -> HttpResponse {
         let mut response = RequestInfoResponse {
             role: request.role(),
             request_id: *request.request_id(),

@@ -3,13 +3,11 @@ mod debug;
 mod route;
 mod utils;
 
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::request::FastCGIRequest;
-use crate::response::HttpResponse;
+use crate::{request::FastCGIRequest, response::HttpResponse};
 
 #[async_trait]
 pub trait RequestHandler: Send + Sync {

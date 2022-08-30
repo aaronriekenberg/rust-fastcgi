@@ -1,6 +1,8 @@
-use std::process::Output;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    process::Output,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
 
@@ -8,13 +10,18 @@ use chrono::prelude::Local;
 
 use log::warn;
 
-use tokio::process::Command;
-use tokio::sync::{Semaphore, SemaphorePermit, TryAcquireError};
+use tokio::{
+    process::Command,
+    sync::{Semaphore, SemaphorePermit, TryAcquireError},
+};
 
 use serde::Serialize;
 
-use crate::handlers::route::URIAndHandler;
-use crate::handlers::utils::{build_json_response, build_status_code_response};
+use crate::handlers::{
+    route::URIAndHandler,
+    utils::{build_json_response, build_status_code_response},
+    {FastCGIRequest, HttpResponse, RequestHandler},
+};
 
 fn current_time_string() -> String {
     Local::now().format("%Y-%m-%d %H:%M:%S%.9f %z").to_string()
@@ -31,11 +38,8 @@ impl AllCommandsHandler {
 }
 
 #[async_trait]
-impl crate::handlers::RequestHandler for AllCommandsHandler {
-    async fn handle(
-        &self,
-        _request: crate::handlers::FastCGIRequest<'_>,
-    ) -> crate::handlers::HttpResponse {
+impl RequestHandler for AllCommandsHandler {
+    async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
         build_json_response(&self.commands)
     }
 }
@@ -87,7 +91,7 @@ impl RunCommandHandler {
     fn handle_command_result(
         &self,
         command_result: Result<(Output, Duration), std::io::Error>,
-    ) -> crate::handlers::HttpResponse {
+    ) -> HttpResponse {
         let (output, command_duration) = match command_result {
             Err(err) => {
                 let response = RunCommandResponse {
@@ -117,11 +121,8 @@ impl RunCommandHandler {
 }
 
 #[async_trait]
-impl crate::handlers::RequestHandler for RunCommandHandler {
-    async fn handle(
-        &self,
-        _request: crate::handlers::FastCGIRequest<'_>,
-    ) -> crate::handlers::HttpResponse {
+impl RequestHandler for RunCommandHandler {
+    async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
         let permit = match self.acquire_run_command_semaphore() {
             Err(err) => {
                 warn!("acquire_run_command_semaphore error {}", err);

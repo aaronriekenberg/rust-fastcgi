@@ -1,10 +1,11 @@
-use std::collections::HashMap;
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 use async_trait::async_trait;
 
-use crate::handlers::utils::build_status_code_response;
-use crate::handlers::RequestHandler;
+use crate::handlers::{
+    utils::build_status_code_response,
+    {FastCGIRequest, HttpResponse, RequestHandler},
+};
 
 pub type URIAndHandler = (String, Box<dyn RequestHandler>);
 
@@ -34,11 +35,8 @@ impl Router {
 }
 
 #[async_trait]
-impl crate::handlers::RequestHandler for Router {
-    async fn handle(
-        &self,
-        request: crate::handlers::FastCGIRequest<'_>,
-    ) -> crate::handlers::HttpResponse {
+impl RequestHandler for Router {
+    async fn handle(&self, request: FastCGIRequest<'_>) -> HttpResponse {
         match request.request_uri() {
             None => build_status_code_response(http::StatusCode::BAD_REQUEST),
             Some(request_uri) => match self.uri_to_request_handler.get(*request_uri) {

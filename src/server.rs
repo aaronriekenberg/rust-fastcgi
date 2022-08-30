@@ -1,16 +1,15 @@
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use log::{debug, error, info, warn};
 
-use tokio::net::unix::SocketAddr;
-use tokio::net::UnixListener;
-use tokio::net::UnixStream;
+use tokio::net::{
+    unix::SocketAddr,
+    {UnixListener, UnixStream},
+};
 
 use tokio_fastcgi::Requests;
 
-use crate::request::FastCGIRequest;
-use crate::response::send_response;
+use crate::{request::FastCGIRequest, response::send_response};
 
 pub struct Server {
     server_configuration: crate::config::ServerConfiguration,
