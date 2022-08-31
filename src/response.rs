@@ -36,8 +36,6 @@ async fn internal_send_response<W: AsyncWrite + Unpin>(
     request: Arc<Request<W>>,
     response: HttpResponse,
 ) -> Result<(), Box<dyn Error>> {
-    debug!("send_response response = {:?}", response);
-
     let mut stdout = request.get_stdout();
 
     let header_string = build_header_string(&response)?;
@@ -56,6 +54,8 @@ pub async fn send_response<W: AsyncWrite + Unpin>(
     request: Arc<Request<W>>,
     response: HttpResponse,
 ) -> RequestResult {
+    debug!("send_response response = {:?}", response);
+
     match internal_send_response(request, response).await {
         Ok(_) => RequestResult::Complete(0),
         Err(err) => {
