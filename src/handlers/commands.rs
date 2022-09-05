@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use crate::handlers::{
     route::URIAndHandler,
-    utils::{build_json_response, build_status_code_response},
+    utils::{build_json_response, build_json_string_response, build_status_code_response},
     {FastCGIRequest, HttpResponse, RequestHandler},
 };
 
@@ -25,19 +25,21 @@ fn current_time_string() -> String {
 }
 
 struct AllCommandsHandler {
-    commands: Vec<crate::config::CommandInfo>,
+    json_string: String,
 }
 
 impl AllCommandsHandler {
-    fn new(commands: Vec<crate::config::CommandInfo>) -> Self {
-        Self { commands }
+    fn new(commands: &Vec<crate::config::CommandInfo>) -> Self {
+        let json_string =
+            serde_json::to_string(commands).expect("AllCommandsHandler::new serialization error");
+        Self { json_string }
     }
 }
 
 #[async_trait]
 impl RequestHandler for AllCommandsHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
-        build_json_response(&self.commands)
+        build_json_string_response(self.json_string.clone())
     }
 }
 
@@ -163,9 +165,7 @@ pub fn create_routes(
 
     routes.push((
         "/cgi-bin/commands".to_string(),
-        Box::new(AllCommandsHandler::new(
-            command_configuration.commands().clone(),
-        )),
+        Box::new(AllCommandsHandler::new(command_configuration.commands())),
     ));
 
     if command_configuration.commands().len() > 0 {
