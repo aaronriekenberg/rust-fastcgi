@@ -146,7 +146,7 @@ impl RequestHandler for RunCommandHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
         let permit = match self.run_command_semaphore.acquire().await {
             Err(err) => {
-                warn!("acquire_run_command_semaphore error: {}", err);
+                warn!("run_command_semaphore.acquire error: {}", err);
                 return build_status_code_response(http::StatusCode::TOO_MANY_REQUESTS);
             }
             Ok(permit) => permit,
