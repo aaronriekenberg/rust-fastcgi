@@ -6,10 +6,7 @@ use log::info;
 
 use serde::{Deserialize, Serialize};
 
-use tokio::{
-    fs::File,
-    io::AsyncReadExt,
-};
+use tokio::{fs::File, io::AsyncReadExt};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
@@ -33,6 +30,7 @@ pub struct CommandInfo {
 #[getset(get = "pub")]
 pub struct CommandConfiguration {
     max_concurrent_commands: usize,
+    semaphore_acquire_timeout_millis: u64,
     commands: Vec<CommandInfo>,
 }
 

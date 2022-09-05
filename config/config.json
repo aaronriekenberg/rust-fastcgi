@@ -6,6 +6,7 @@
     },
     "command_configuration": {
         "max_concurrent_commands": 10,
+        "semaphore_acquire_timeout_millis": 200,
         "commands": [
             {
                 "id": "chronyc_sources",

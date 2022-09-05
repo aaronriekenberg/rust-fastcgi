@@ -5,12 +5,16 @@
         "max_requests_per_connection": 10
     },
     "command_configuration": {
-        "max_concurrent_commands": 10,
+        "max_concurrent_commands": 1,
+        "semaphore_acquire_timeout_millis": 200,
         "commands": [
             {
-                "id": "uptime",
-                "description": "uptime",
-                "command": "/usr/bin/uptime"
+                "id": "sleep",
+                "description": "sleep",
+                "command": "/bin/sleep",
+                "args": [
+                    "5"
+                ]
             },
             {
                 "id": "vmstat",

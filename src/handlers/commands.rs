@@ -1,8 +1,4 @@
-use std::{
-    process::Output,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{process::Output, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -12,7 +8,8 @@ use log::warn;
 
 use tokio::{
     process::Command,
-    sync::{Semaphore, SemaphorePermit, TryAcquireError},
+    sync::{Semaphore, SemaphorePermit},
+    time::{Duration, Instant},
 };
 
 use serde::Serialize;
@@ -44,6 +41,32 @@ impl RequestHandler for AllCommandsHandler {
     }
 }
 
+struct RunCommandSemapore {
+    semapore: Semaphore,
+    acquire_timeout: Duration,
+}
+
+impl RunCommandSemapore {
+    fn new(command_configuration: &crate::config::CommandConfiguration) -> Arc<Self> {
+        Arc::new(Self {
+            semapore: Semaphore::new(*command_configuration.max_concurrent_commands()),
+            acquire_timeout: Duration::from_millis(
+                *command_configuration.semaphore_acquire_timeout_millis(),
+            ),
+        })
+    }
+
+    async fn acquire(&self) -> Result<SemaphorePermit<'_>, Box<dyn std::error::Error>> {
+        let result = tokio::time::timeout(self.acquire_timeout, self.semapore.acquire())
+            .await
+            .map_err(|timeout_error| format!("timeout error: {}", timeout_error))?;
+
+        let permit = result.map_err(|acquire_error| format!("acquire error: {}", acquire_error))?;
+
+        Ok(permit)
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct RunCommandResponse<'a> {
     now: String,
@@ -53,23 +76,19 @@ struct RunCommandResponse<'a> {
 }
 
 struct RunCommandHandler {
-    run_command_semaphore: Arc<Semaphore>,
+    run_command_semaphore: Arc<RunCommandSemapore>,
     command_info: crate::config::CommandInfo,
 }
 
 impl RunCommandHandler {
     fn new(
-        run_command_semaphore: Arc<Semaphore>,
+        run_command_semaphore: Arc<RunCommandSemapore>,
         command_info: crate::config::CommandInfo,
     ) -> Self {
         Self {
             run_command_semaphore,
             command_info,
         }
-    }
-
-    fn acquire_run_command_semaphore(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
-        self.run_command_semaphore.try_acquire()
     }
 
     async fn run_command(
@@ -123,9 +142,9 @@ impl RunCommandHandler {
 #[async_trait]
 impl RequestHandler for RunCommandHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
-        let permit = match self.acquire_run_command_semaphore() {
+        let permit = match self.run_command_semaphore.acquire().await {
             Err(err) => {
-                warn!("acquire_run_command_semaphore error {}", err);
+                warn!("acquire_run_command_semaphore error: {}", err);
                 return build_status_code_response(http::StatusCode::TOO_MANY_REQUESTS);
             }
             Ok(permit) => permit,
@@ -150,9 +169,7 @@ pub fn create_routes(
     ));
 
     if command_configuration.commands().len() > 0 {
-        let run_command_semaphore = Arc::new(Semaphore::new(
-            *command_configuration.max_concurrent_commands(),
-        ));
+        let run_command_semaphore = RunCommandSemapore::new(command_configuration);
 
         for command_info in command_configuration.commands() {
             let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
