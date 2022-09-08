@@ -46,9 +46,9 @@ impl RequestHandler for AllCommandsHandler {
 #[derive(thiserror::Error, Debug)]
 enum RunCommandSemaporeAcquireError {
     #[error("acquire timeout: {0}")]
-    Timeout(tokio::time::error::Elapsed),
+    Timeout(#[from] tokio::time::error::Elapsed),
     #[error("acquire error: {0}")]
-    AcquireError(tokio::sync::AcquireError),
+    AcquireError(#[from] tokio::sync::AcquireError),
 }
 
 struct RunCommandSemapore {
@@ -68,11 +68,9 @@ impl RunCommandSemapore {
 
     async fn acquire(&self) -> Result<SemaphorePermit<'_>, RunCommandSemaporeAcquireError> {
         let result = tokio::time::timeout(self.acquire_timeout, self.semapore.acquire())
-            .await
-            .map_err(|timeout_error| RunCommandSemaporeAcquireError::Timeout(timeout_error))?;
+            .await?;
 
-        let permit = result
-            .map_err(|acquire_error| RunCommandSemaporeAcquireError::AcquireError(acquire_error))?;
+        let permit = result?;
 
         Ok(permit)
     }
