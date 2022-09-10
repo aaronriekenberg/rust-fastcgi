@@ -16,12 +16,15 @@ async fn main() -> anyhow::Result<()> {
         .nth(1)
         .context("config file required as command line argument")?;
 
-    let configuration = crate::config::read_configuration(config_file).await?;
+    let configuration = crate::config::read_configuration(config_file)
+        .await
+        .context("read_configuration error")?;
 
-    let handlers = crate::handlers::create_handlers(&configuration)?;
+    let handlers =
+        crate::handlers::create_handlers(&configuration).context("create_handlers error")?;
 
     let server = crate::server::Server::new(handlers, configuration.server_configuration());
-    server.run().await?;
+    server.run().await.context("server.run error")?;
 
     Ok(())
 }

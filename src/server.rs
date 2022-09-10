@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use log::{debug, error, info, warn};
+use anyhow::Context;
+
+use log::{debug, info, warn};
 
 use tokio::net::{
     unix::SocketAddr,
@@ -34,9 +36,12 @@ impl Server {
         let remove_result = tokio::fs::remove_file(path).await;
         debug!("remove_result = {:?}", remove_result);
 
-        let listener = UnixListener::bind(path)?;
+        let listener = UnixListener::bind(path)
+            .with_context(|| format!("UnixListener::bind error path '{}'", path))?;
 
-        info!("listening on {:?}", listener.local_addr()?);
+        let local_addr = listener.local_addr().context("local_addr error")?;
+
+        info!("listening on {:?}", local_addr);
 
         Ok(listener)
     }
@@ -82,22 +87,22 @@ impl Server {
     }
 
     pub async fn run(self) -> anyhow::Result<()> {
-        let listener = self.create_listener().await?;
+        let listener = self
+            .create_listener()
+            .await
+            .context("Server::create_listener error")?;
 
         loop {
             let connection = listener.accept().await;
             // Accept new connections
             match connection {
                 Err(err) => {
-                    error!("Establishing connection failed: {}", err);
-                    break;
+                    anyhow::bail!("Establishing connection failed err: {}", err);
                 }
                 Ok((stream, address)) => {
                     self.handle_connection(stream, address);
                 }
             }
         }
-
-        Ok(())
     }
 }

@@ -1,4 +1,5 @@
 use anyhow::Context;
+
 use getset::Getters;
 
 use log::info;
@@ -43,31 +44,18 @@ pub struct Configuration {
 pub async fn read_configuration(config_file: String) -> anyhow::Result<Configuration> {
     info!("reading {}", config_file);
 
-    let mut file = File::open(&config_file).await.with_context(|| {
-        format!(
-            "read_configuration: error opening config file '{}'",
-            config_file
-        )
-    })?;
+    let mut file = File::open(&config_file)
+        .await
+        .with_context(|| format!("error opening config file '{}'", config_file))?;
 
     let mut file_contents = Vec::new();
 
     file.read_to_end(&mut file_contents)
         .await
-        .with_context(|| {
-            format!(
-                "read_configuration: error reading config file '{}'",
-                config_file
-            )
-        })?;
+        .with_context(|| format!("error reading config file '{}'", config_file))?;
 
-    let configuration: Configuration =
-        ::serde_json::from_slice(&file_contents).with_context(|| {
-            format!(
-                "read_configuration: error unmarshalling config file '{}'",
-                config_file
-            )
-        })?;
+    let configuration: Configuration = ::serde_json::from_slice(&file_contents)
+        .with_context(|| format!("error unmarshalling config file '{}'", config_file))?;
 
     info!("configuration\n{:#?}", configuration);
 
