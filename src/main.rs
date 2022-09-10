@@ -2,14 +2,15 @@
 
 use anyhow::Context;
 
+use log::error;
+
 mod config;
 mod handlers;
 mod request;
 mod response;
 mod server;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn try_main() -> anyhow::Result<()> {
     env_logger::builder().format_timestamp_nanos().init();
 
     let config_file = std::env::args()
@@ -27,4 +28,12 @@ async fn main() -> anyhow::Result<()> {
     server.run().await.context("server.run error")?;
 
     Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    if let Err(err) = try_main().await {
+        error!("try_main error:\n{:#}", err);
+        std::process::exit(1);
+    }
 }
