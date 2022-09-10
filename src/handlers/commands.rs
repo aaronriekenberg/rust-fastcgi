@@ -1,5 +1,6 @@
 use std::{process::Output, sync::Arc};
 
+use anyhow::Context;
 use async_trait::async_trait;
 
 use chrono::prelude::Local;
@@ -29,10 +30,11 @@ struct AllCommandsHandler {
 }
 
 impl AllCommandsHandler {
-    fn new(commands: &Vec<crate::config::CommandInfo>) -> Self {
-        let json_string =
-            serde_json::to_string(commands).expect("AllCommandsHandler::new serialization error");
-        Self { json_string }
+    fn new(commands: &Vec<crate::config::CommandInfo>) -> anyhow::Result<Self> {
+        let json_string = serde_json::to_string(commands)
+            .context("AllCommandsHandler::new: json marshal error")?;
+
+        Ok(Self { json_string })
     }
 }
 
@@ -47,6 +49,7 @@ impl RequestHandler for AllCommandsHandler {
 enum RunCommandSemaporeAcquireError {
     #[error("acquire timeout: {0}")]
     Timeout(#[from] tokio::time::error::Elapsed),
+
     #[error("acquire error: {0}")]
     AcquireError(#[from] tokio::sync::AcquireError),
 }
@@ -67,8 +70,7 @@ impl RunCommandSemapore {
     }
 
     async fn acquire(&self) -> Result<SemaphorePermit<'_>, RunCommandSemaporeAcquireError> {
-        let result = tokio::time::timeout(self.acquire_timeout, self.semapore.acquire())
-            .await?;
+        let result = tokio::time::timeout(self.acquire_timeout, self.semapore.acquire()).await?;
 
         let permit = result?;
 
@@ -167,12 +169,12 @@ impl RequestHandler for RunCommandHandler {
 
 pub fn create_routes(
     command_configuration: &crate::config::CommandConfiguration,
-) -> Vec<URIAndHandler> {
+) -> anyhow::Result<Vec<URIAndHandler>> {
     let mut routes: Vec<URIAndHandler> = Vec::new();
 
     routes.push((
         "/cgi-bin/commands".to_string(),
-        Box::new(AllCommandsHandler::new(command_configuration.commands())),
+        Box::new(AllCommandsHandler::new(command_configuration.commands())?),
     ));
 
     if command_configuration.commands().len() > 0 {
@@ -191,5 +193,5 @@ pub fn create_routes(
         }
     }
 
-    routes
+    Ok(routes)
 }

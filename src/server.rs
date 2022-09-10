@@ -1,4 +1,4 @@
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 use log::{debug, error, info, warn};
 
@@ -27,7 +27,7 @@ impl Server {
         }
     }
 
-    async fn create_listener(&self) -> Result<UnixListener, Box<dyn Error>> {
+    async fn create_listener(&self) -> anyhow::Result<UnixListener> {
         let path = self.server_configuration.socket_path();
 
         // do not fail on remove error, the path may not exist.
@@ -81,7 +81,7 @@ impl Server {
         });
     }
 
-    pub async fn run(self) -> Result<(), Box<dyn Error>> {
+    pub async fn run(self) -> anyhow::Result<()> {
         let listener = self.create_listener().await?;
 
         loop {

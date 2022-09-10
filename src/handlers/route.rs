@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error};
+use std::collections::HashMap;
 
 use async_trait::async_trait;
 
@@ -14,7 +14,7 @@ pub struct Router {
 }
 
 impl Router {
-    pub fn new(routes: Vec<URIAndHandler>) -> Result<Self, Box<dyn Error>> {
+    pub fn new(routes: Vec<URIAndHandler>) -> anyhow::Result<Self> {
         let mut router = Self {
             uri_to_request_handler: HashMap::new(),
         };
@@ -24,10 +24,7 @@ impl Router {
                 .insert(uri.clone(), handler)
                 .is_some()
             {
-                Err(format!(
-                    "Router::new error: collision in router uri '{}'",
-                    uri
-                ))?
+                anyhow::bail!("Router::new error: collision in router uri '{}'", uri);
             }
         }
         Ok(router)

@@ -3,7 +3,7 @@ mod debug;
 mod route;
 mod utils;
 
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
@@ -16,12 +16,12 @@ pub trait RequestHandler: Send + Sync {
 
 pub fn create_handlers(
     configuration: &crate::config::Configuration,
-) -> Result<Arc<dyn RequestHandler>, Box<dyn Error>> {
+) -> anyhow::Result<Arc<dyn RequestHandler>> {
     let mut routes = Vec::new();
 
     routes.append(&mut commands::create_routes(
         configuration.command_configuration(),
-    ));
+    )?);
 
     routes.append(&mut debug::create_routes());
 

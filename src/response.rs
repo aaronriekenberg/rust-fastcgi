@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Write, sync::Arc};
+use std::{fmt::Write, sync::Arc};
 
 use log::{debug, warn};
 
@@ -8,7 +8,7 @@ use tokio_fastcgi::{Request, RequestResult};
 
 pub type HttpResponse = http::Response<Option<String>>;
 
-fn build_header_string(response: &HttpResponse) -> Result<String, Box<dyn Error>> {
+fn build_header_string(response: &HttpResponse) -> Result<String, std::fmt::Error> {
     let mut header_string = String::new();
 
     write!(
@@ -32,10 +32,19 @@ fn build_header_string(response: &HttpResponse) -> Result<String, Box<dyn Error>
     Ok(header_string)
 }
 
+#[derive(thiserror::Error, Debug)]
+enum SendResponseError {
+    #[error("build header string error: {0}")]
+    BuildHeaderStringError(#[from] std::fmt::Error),
+
+    #[error("tokio_fastcgi write error: {0}")]
+    TokioFastCGIWriteError(#[from] tokio_fastcgi::Error),
+}
+
 async fn internal_send_response<W: AsyncWrite + Unpin>(
     request: Arc<Request<W>>,
     response: HttpResponse,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SendResponseError> {
     let mut stdout = request.get_stdout();
 
     let header_string = build_header_string(&response)?;
