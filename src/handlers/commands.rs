@@ -1,4 +1,4 @@
-use std::{process::Output, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Context;
 
@@ -106,46 +106,41 @@ impl RunCommandHandler {
     async fn run_command(
         &self,
         _permit: SemaphorePermit<'_>,
-    ) -> Result<(Output, Duration), std::io::Error> {
-        let command_start_time = Instant::now();
-
+    ) -> Result<std::process::Output, std::io::Error> {
         let output = Command::new(self.command_info.command())
             .args(self.command_info.args())
             .output()
             .await?;
 
-        let duration = Instant::now() - command_start_time;
-
-        Ok((output, duration))
+        Ok(output)
     }
 
     fn handle_command_result(
         &self,
-        command_result: Result<(Output, Duration), std::io::Error>,
+        command_result: Result<std::process::Output, std::io::Error>,
+        command_duration: Duration,
     ) -> HttpResponse {
-        let (output, command_duration) = match command_result {
+        let mut response = RunCommandResponse {
+            now: current_time_string(),
+            command_duration_ms: command_duration.as_millis(),
+            command_info: &self.command_info,
+            command_output: String::new(),
+        };
+
+        let command_output = match command_result {
             Err(err) => {
-                let response = RunCommandResponse {
-                    now: current_time_string(),
-                    command_duration_ms: 0,
-                    command_info: &self.command_info,
-                    command_output: format!("error running command {}", err),
-                };
+                response.command_output = format!("error running command {}", err);
                 return build_json_response(response);
             }
             Ok(result) => result,
         };
 
-        let mut combined_output = String::with_capacity(output.stderr.len() + output.stdout.len());
-        combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
-        combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
+        let mut combined_output =
+            String::with_capacity(command_output.stderr.len() + command_output.stdout.len());
+        combined_output.push_str(&String::from_utf8_lossy(&command_output.stderr));
+        combined_output.push_str(&String::from_utf8_lossy(&command_output.stdout));
 
-        let response = RunCommandResponse {
-            now: current_time_string(),
-            command_duration_ms: command_duration.as_millis(),
-            command_info: &self.command_info,
-            command_output: combined_output,
-        };
+        response.command_output = combined_output;
 
         build_json_response(response)
     }
@@ -162,9 +157,11 @@ impl RequestHandler for RunCommandHandler {
             Ok(permit) => permit,
         };
 
-        let result = self.run_command(permit).await;
+        let command_start_time = Instant::now();
+        let command_result = self.run_command(permit).await;
+        let command_duration = command_start_time.elapsed();
 
-        self.handle_command_result(result)
+        self.handle_command_result(command_result, command_duration)
     }
 }
 
