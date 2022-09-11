@@ -25,6 +25,7 @@ async fn try_main() -> anyhow::Result<()> {
         crate::handlers::create_handlers(&configuration).context("create_handlers error")?;
 
     let server = crate::server::Server::new(handlers, configuration.server_configuration());
+
     server.run().await.context("server.run error")?;
 
     Ok(())
@@ -33,7 +34,7 @@ async fn try_main() -> anyhow::Result<()> {
 #[tokio::main]
 async fn main() {
     if let Err(err) = try_main().await {
-        error!("try_main error:\n{:#}", err);
+        error!("main got fatal error:\n{:#}", err);
         std::process::exit(1);
     }
 }
