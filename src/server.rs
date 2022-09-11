@@ -47,7 +47,7 @@ impl Server {
     }
 
     fn handle_connection(&self, stream: UnixStream, address: SocketAddr) {
-        debug!("Connection from {:?}", address);
+        debug!("connection from {:?}", address);
 
         let conn_handlers = Arc::clone(&self.handlers);
 
@@ -80,7 +80,7 @@ impl Server {
                     .await
                 {
                     // This is the error handler that is called if the process call returns an error.
-                    warn!("Processing request failed: err = {}", err,);
+                    warn!("request.process failed: err = {}", err,);
                 }
             }
         });
@@ -97,7 +97,7 @@ impl Server {
             // Accept new connections
             match connection {
                 Err(err) => {
-                    anyhow::bail!("Establishing connection failed err: {}", err);
+                    anyhow::bail!("establishing connection failed err: {}", err);
                 }
                 Ok((stream, address)) => {
                     self.handle_connection(stream, address);
