@@ -17,7 +17,7 @@ pub fn build_json_response(response_dto: impl Serialize) -> HttpResponse {
 
     match json_result {
         Err(e) => {
-            warn!("json serialization error {}", e);
+            warn!("build_json_response serialization error {}", e);
 
             http::Response::builder()
                 .status(http::StatusCode::INTERNAL_SERVER_ERROR)
