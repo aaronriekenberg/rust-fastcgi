@@ -120,27 +120,24 @@ impl RunCommandHandler {
         command_result: Result<std::process::Output, std::io::Error>,
         command_duration: Duration,
     ) -> HttpResponse {
-        let mut response = RunCommandResponse {
+        let response = RunCommandResponse {
             now: current_time_string(),
             command_duration_ms: command_duration.as_millis(),
             command_info: &self.command_info,
-            command_output: String::new(),
+            command_output: match command_result {
+                Err(err) => {
+                    format!("error running command {}", err)
+                }
+                Ok(command_output) => {
+                    let mut combined_output = String::with_capacity(
+                        command_output.stderr.len() + command_output.stdout.len(),
+                    );
+                    combined_output.push_str(&String::from_utf8_lossy(&command_output.stderr));
+                    combined_output.push_str(&String::from_utf8_lossy(&command_output.stdout));
+                    combined_output
+                }
+            },
         };
-
-        let command_output = match command_result {
-            Err(err) => {
-                response.command_output = format!("error running command {}", err);
-                return build_json_response(response);
-            }
-            Ok(result) => result,
-        };
-
-        let mut combined_output =
-            String::with_capacity(command_output.stderr.len() + command_output.stdout.len());
-        combined_output.push_str(&String::from_utf8_lossy(&command_output.stderr));
-        combined_output.push_str(&String::from_utf8_lossy(&command_output.stdout));
-
-        response.command_output = combined_output;
 
         build_json_response(response)
     }
