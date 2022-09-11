@@ -41,10 +41,10 @@ pub struct Configuration {
     command_configuration: CommandConfiguration,
 }
 
-pub async fn read_configuration(config_file: String) -> anyhow::Result<Configuration> {
-    info!("reading {}", config_file);
+pub async fn read_configuration(config_file: &str) -> anyhow::Result<Configuration> {
+    info!("reading '{}'", config_file);
 
-    let mut file = File::open(&config_file)
+    let mut file = File::open(config_file)
         .await
         .with_context(|| format!("error opening '{}'", config_file))?;
 

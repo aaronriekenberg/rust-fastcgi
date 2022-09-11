@@ -68,7 +68,7 @@ pub async fn send_response<W: AsyncWrite + Unpin>(
     match internal_send_response(request, response).await {
         Ok(_) => RequestResult::Complete(0),
         Err(err) => {
-            warn!("Send response failed: {}", err);
+            warn!("send response failed: {}", err);
             RequestResult::Complete(1)
         }
     }
