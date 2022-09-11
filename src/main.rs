@@ -17,7 +17,7 @@ async fn try_main() -> anyhow::Result<()> {
         .nth(1)
         .context("config file required as command line argument")?;
 
-    let configuration = crate::config::read_configuration(&config_file)
+    let configuration = crate::config::read_configuration(config_file)
         .await
         .context("read_configuration error")?;
 
