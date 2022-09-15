@@ -16,7 +16,7 @@ pub struct Router {
 impl Router {
     pub fn new(routes: Vec<URIAndHandler>) -> anyhow::Result<Self> {
         let mut router = Self {
-            uri_to_request_handler: HashMap::new(),
+            uri_to_request_handler: HashMap::with_capacity(routes.len()),
         };
         for (ref uri, handler) in routes {
             if router
