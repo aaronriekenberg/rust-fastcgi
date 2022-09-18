@@ -56,20 +56,25 @@ impl JemallocEpochController {
 }
 
 #[derive(Debug, Default, Serialize)]
-struct JemallocStatsResponse {
+struct JemallocStatsResponse<'a> {
+    epoch_interval_seconds: u64,
+    epoch_number: u64,
     allocated_bytes: usize,
     resident_bytes: usize,
     num_arenas: u32,
-    epoch_interval_seconds: u64,
-    epoch_number: u64,
-    jemalloc_version: &'static str,
+    current_thread_name: &'a str,
+    current_thread_allocated_bytes: u64,
+    current_thread_deallocated_bytes: u64,
+    jemalloc_version: &'a str,
 }
 
 struct JemallocStatsHandler {
+    epoch_controller: Arc<JemallocEpochController>,
     allocated: tikv_jemalloc_ctl::stats::allocated_mib,
     resident: tikv_jemalloc_ctl::stats::resident_mib,
     narenas: tikv_jemalloc_ctl::arenas::narenas_mib,
-    epoch_controller: Arc<JemallocEpochController>,
+    thread_allocatedp: tikv_jemalloc_ctl::thread::allocatedp_mib,
+    thread_deallocatedp: tikv_jemalloc_ctl::thread::deallocatedp_mib,
     jemalloc_version: &'static str,
 }
 
@@ -81,18 +86,25 @@ impl JemallocStatsHandler {
         let resident = tikv_jemalloc_ctl::stats::resident::mib()
             .context("tikv_jemalloc_ctl::stats::resident::mib")?;
 
-
         let narenas = tikv_jemalloc_ctl::arenas::narenas::mib()
-        .context("tikv_jemalloc_ctl::arenas::narenas::mib")?;
+            .context("tikv_jemalloc_ctl::arenas::narenas::mib")?;
+
+        let thread_allocatedp = tikv_jemalloc_ctl::thread::allocatedp::mib()
+            .context("tikv_jemalloc_ctl::thread::allocatedp::mib")?;
+
+        let thread_deallocatedp = tikv_jemalloc_ctl::thread::deallocatedp::mib()
+            .context("tikv_jemalloc_ctl::thread::allocatedp::mib")?;
 
         let jemalloc_version =
             tikv_jemalloc_ctl::version::read().context("tikv_jemalloc_ctl::version::read")?;
 
         Ok(Self {
+            epoch_controller,
             allocated,
             resident,
             narenas,
-            epoch_controller,
+            thread_allocatedp,
+            thread_deallocatedp,
             jemalloc_version,
         })
     }
@@ -105,12 +117,28 @@ impl RequestHandler for JemallocStatsHandler {
         let resident_bytes = self.resident.read().unwrap_or(0);
         let num_arenas = self.narenas.read().unwrap_or(0);
 
+        let current_thread = std::thread::current();
+        let current_thread_name = current_thread.name().unwrap_or("UNKNOWN");
+
+        let current_thread_allocated_bytes = match self.thread_allocatedp.read() {
+            Ok(thread_local_data) => thread_local_data.get(),
+            Err(_) => 0,
+        };
+
+        let current_thread_deallocated_bytes = match self.thread_deallocatedp.read() {
+            Ok(thread_local_data) => thread_local_data.get(),
+            Err(_) => 0,
+        };
+
         let response = JemallocStatsResponse {
+            epoch_interval_seconds: EPOCH_INTERVAL_SECONDS,
+            epoch_number: self.epoch_controller.get_epoch_number(),
             allocated_bytes,
             resident_bytes,
             num_arenas,
-            epoch_interval_seconds: EPOCH_INTERVAL_SECONDS,
-            epoch_number: self.epoch_controller.get_epoch_number(),
+            current_thread_name,
+            current_thread_allocated_bytes,
+            current_thread_deallocated_bytes,
             jemalloc_version: self.jemalloc_version,
         };
 
