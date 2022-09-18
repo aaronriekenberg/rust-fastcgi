@@ -50,27 +50,12 @@ impl JemallocEpochController {
         });
     }
 
-    fn get_epoch_number(&self) -> u64 {
+    fn epoch_number(&self) -> u64 {
         self.epoch_number.load(Ordering::Relaxed)
     }
 }
 
-#[derive(Debug, Default, Serialize)]
-struct JemallocStatsResponse<'a> {
-    epoch_interval_seconds: u64,
-    epoch_number: u64,
-    active_bytes: usize,
-    allocated_bytes: usize,
-    resident_bytes: usize,
-    retained_bytes: usize,
-    num_arenas: u32,
-    current_thread_name: &'a str,
-    current_thread_allocated_bytes: u64,
-    current_thread_deallocated_bytes: u64,
-    jemalloc_version: &'a str,
-}
-
-struct JemallocStatsHandler {
+struct JemallocStatsService {
     epoch_controller: Arc<JemallocEpochController>,
     active: tikv_jemalloc_ctl::stats::active_mib,
     allocated: tikv_jemalloc_ctl::stats::allocated_mib,
@@ -82,8 +67,12 @@ struct JemallocStatsHandler {
     jemalloc_version: &'static str,
 }
 
-impl JemallocStatsHandler {
-    fn new(epoch_controller: Arc<JemallocEpochController>) -> anyhow::Result<Self> {
+impl JemallocStatsService {
+    fn new() -> anyhow::Result<Arc<Self>> {
+        let epoch_controller =
+            JemallocEpochController::new().context("JemallocEpochController::new")?;
+        epoch_controller.start_epoch_updates();
+
         let active = tikv_jemalloc_ctl::stats::active::mib()
             .context("tikv_jemalloc_ctl::stats::active::mib")?;
 
@@ -108,7 +97,7 @@ impl JemallocStatsHandler {
         let jemalloc_version =
             tikv_jemalloc_ctl::version::read().context("tikv_jemalloc_ctl::version::read")?;
 
-        Ok(Self {
+        Ok(Arc::new(Self {
             epoch_controller,
             active,
             allocated,
@@ -118,35 +107,99 @@ impl JemallocStatsHandler {
             thread_allocatedp,
             thread_deallocatedp,
             jemalloc_version,
-        })
+        }))
+    }
+
+    fn epoch_number(&self) -> u64 {
+        self.epoch_controller.epoch_number()
+    }
+
+    fn active_bytes(&self) -> usize {
+        self.active.read().unwrap_or(0)
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.allocated.read().unwrap_or(0)
+    }
+
+    fn resident_bytes(&self) -> usize {
+        self.resident.read().unwrap_or(0)
+    }
+
+    fn retained_bytes(&self) -> usize {
+        self.retained.read().unwrap_or(0)
+    }
+
+    fn num_arenas(&self) -> u32 {
+        self.narenas.read().unwrap_or(0)
+    }
+
+    fn current_thread_allocated_bytes(&self) -> u64 {
+        match self.thread_allocatedp.read() {
+            Ok(thread_local_data) => thread_local_data.get(),
+            Err(_) => 0,
+        }
+    }
+
+    fn current_thread_deallocated_bytes(&self) -> u64 {
+        match self.thread_deallocatedp.read() {
+            Ok(thread_local_data) => thread_local_data.get(),
+            Err(_) => 0,
+        }
+    }
+
+    fn jemalloc_version(&self) -> &str {
+        self.jemalloc_version
+    }
+}
+
+#[derive(Debug, Default, Serialize)]
+struct JemallocStatsResponse<'a> {
+    epoch_interval_seconds: u64,
+    epoch_number: u64,
+    active_bytes: usize,
+    allocated_bytes: usize,
+    resident_bytes: usize,
+    retained_bytes: usize,
+    num_arenas: u32,
+    current_thread_name: &'a str,
+    current_thread_allocated_bytes: u64,
+    current_thread_deallocated_bytes: u64,
+    jemalloc_version: &'a str,
+}
+
+struct JemallocStatsHandler {
+    stats_service: Arc<JemallocStatsService>,
+}
+
+impl JemallocStatsHandler {
+    fn new(stats_service: Arc<JemallocStatsService>) -> anyhow::Result<Self> {
+        Ok(Self { stats_service })
     }
 }
 
 #[async_trait]
 impl RequestHandler for JemallocStatsHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
-        let active_bytes = self.active.read().unwrap_or(0);
-        let allocated_bytes = self.allocated.read().unwrap_or(0);
-        let resident_bytes = self.resident.read().unwrap_or(0);
-        let retained_bytes = self.retained.read().unwrap_or(0);
-        let num_arenas = self.narenas.read().unwrap_or(0);
+        let epoch_number = self.stats_service.epoch_number();
+        let active_bytes = self.stats_service.active_bytes();
+        let allocated_bytes = self.stats_service.allocated_bytes();
+        let resident_bytes = self.stats_service.resident_bytes();
+        let retained_bytes = self.stats_service.retained_bytes();
+        let num_arenas = self.stats_service.num_arenas();
 
         let current_thread = std::thread::current();
         let current_thread_name = current_thread.name().unwrap_or("UNKNOWN");
 
-        let current_thread_allocated_bytes = match self.thread_allocatedp.read() {
-            Ok(thread_local_data) => thread_local_data.get(),
-            Err(_) => 0,
-        };
+        let current_thread_allocated_bytes = self.stats_service.current_thread_allocated_bytes();
+        let current_thread_deallocated_bytes =
+            self.stats_service.current_thread_deallocated_bytes();
 
-        let current_thread_deallocated_bytes = match self.thread_deallocatedp.read() {
-            Ok(thread_local_data) => thread_local_data.get(),
-            Err(_) => 0,
-        };
+        let jemalloc_version = self.stats_service.jemalloc_version();
 
         let response = JemallocStatsResponse {
             epoch_interval_seconds: EPOCH_INTERVAL_SECONDS,
-            epoch_number: self.epoch_controller.get_epoch_number(),
+            epoch_number,
             active_bytes,
             allocated_bytes,
             resident_bytes,
@@ -155,7 +208,7 @@ impl RequestHandler for JemallocStatsHandler {
             current_thread_name,
             current_thread_allocated_bytes,
             current_thread_deallocated_bytes,
-            jemalloc_version: self.jemalloc_version,
+            jemalloc_version,
         };
 
         build_json_response(response)
@@ -163,11 +216,10 @@ impl RequestHandler for JemallocStatsHandler {
 }
 
 pub fn create_routes() -> anyhow::Result<Vec<URIAndHandler>> {
-    let epoch_controller = JemallocEpochController::new()?;
-    epoch_controller.start_epoch_updates();
+    let stats_service = JemallocStatsService::new()?;
 
     Ok(vec![(
         "/cgi-bin/jemalloc_stats".to_string(),
-        Box::new(JemallocStatsHandler::new(epoch_controller)?),
+        Box::new(JemallocStatsHandler::new(stats_service)?),
     )])
 }
