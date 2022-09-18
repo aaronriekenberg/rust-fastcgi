@@ -59,8 +59,10 @@ impl JemallocEpochController {
 struct JemallocStatsResponse<'a> {
     epoch_interval_seconds: u64,
     epoch_number: u64,
+    active_bytes: usize,
     allocated_bytes: usize,
     resident_bytes: usize,
+    retained_bytes: usize,
     num_arenas: u32,
     current_thread_name: &'a str,
     current_thread_allocated_bytes: u64,
@@ -70,8 +72,10 @@ struct JemallocStatsResponse<'a> {
 
 struct JemallocStatsHandler {
     epoch_controller: Arc<JemallocEpochController>,
+    active: tikv_jemalloc_ctl::stats::active_mib,
     allocated: tikv_jemalloc_ctl::stats::allocated_mib,
     resident: tikv_jemalloc_ctl::stats::resident_mib,
+    retained: tikv_jemalloc_ctl::stats::retained_mib,
     narenas: tikv_jemalloc_ctl::arenas::narenas_mib,
     thread_allocatedp: tikv_jemalloc_ctl::thread::allocatedp_mib,
     thread_deallocatedp: tikv_jemalloc_ctl::thread::deallocatedp_mib,
@@ -80,11 +84,17 @@ struct JemallocStatsHandler {
 
 impl JemallocStatsHandler {
     fn new(epoch_controller: Arc<JemallocEpochController>) -> anyhow::Result<Self> {
+        let active = tikv_jemalloc_ctl::stats::active::mib()
+            .context("tikv_jemalloc_ctl::stats::active::mib")?;
+
         let allocated = tikv_jemalloc_ctl::stats::allocated::mib()
             .context("tikv_jemalloc_ctl::stats::allocated::mib")?;
 
         let resident = tikv_jemalloc_ctl::stats::resident::mib()
             .context("tikv_jemalloc_ctl::stats::resident::mib")?;
+
+        let retained = tikv_jemalloc_ctl::stats::retained::mib()
+            .context("tikv_jemalloc_ctl::stats::retained::mib")?;
 
         let narenas = tikv_jemalloc_ctl::arenas::narenas::mib()
             .context("tikv_jemalloc_ctl::arenas::narenas::mib")?;
@@ -100,8 +110,10 @@ impl JemallocStatsHandler {
 
         Ok(Self {
             epoch_controller,
+            active,
             allocated,
             resident,
+            retained,
             narenas,
             thread_allocatedp,
             thread_deallocatedp,
@@ -113,8 +125,10 @@ impl JemallocStatsHandler {
 #[async_trait]
 impl RequestHandler for JemallocStatsHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
+        let active_bytes = self.active.read().unwrap_or(0);
         let allocated_bytes = self.allocated.read().unwrap_or(0);
         let resident_bytes = self.resident.read().unwrap_or(0);
+        let retained_bytes = self.retained.read().unwrap_or(0);
         let num_arenas = self.narenas.read().unwrap_or(0);
 
         let current_thread = std::thread::current();
@@ -133,8 +147,10 @@ impl RequestHandler for JemallocStatsHandler {
         let response = JemallocStatsResponse {
             epoch_interval_seconds: EPOCH_INTERVAL_SECONDS,
             epoch_number: self.epoch_controller.get_epoch_number(),
+            active_bytes,
             allocated_bytes,
             resident_bytes,
+            retained_bytes,
             num_arenas,
             current_thread_name,
             current_thread_allocated_bytes,
