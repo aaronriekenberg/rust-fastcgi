@@ -59,6 +59,7 @@ impl JemallocEpochController {
 struct JemallocStatsResponse {
     allocated_bytes: usize,
     resident_bytes: usize,
+    jemalloc_version: &'static str,
     epoch_interval_seconds: u64,
     epoch_number: u64,
 }
@@ -66,6 +67,7 @@ struct JemallocStatsResponse {
 struct JemallocStatsHandler {
     allocated: tikv_jemalloc_ctl::stats::allocated_mib,
     resident: tikv_jemalloc_ctl::stats::resident_mib,
+    jemalloc_version: &'static str,
     epoch_controller: Arc<JemallocEpochController>,
 }
 
@@ -77,9 +79,13 @@ impl JemallocStatsHandler {
         let resident = tikv_jemalloc_ctl::stats::resident::mib()
             .context("tikv_jemalloc_ctl::stats::resident::mib")?;
 
+        let jemalloc_version =
+            tikv_jemalloc_ctl::version::read().context("tikv_jemalloc_ctl::version::read")?;
+
         Ok(Self {
             allocated,
             resident,
+            jemalloc_version,
             epoch_controller,
         })
     }
@@ -94,6 +100,7 @@ impl RequestHandler for JemallocStatsHandler {
         let response = JemallocStatsResponse {
             allocated_bytes,
             resident_bytes,
+            jemalloc_version: self.jemalloc_version,
             epoch_interval_seconds: EPOCH_INTERVAL_SECONDS,
             epoch_number: self.epoch_controller.get_epoch_number(),
         };
