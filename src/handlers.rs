@@ -1,5 +1,6 @@
 mod commands;
-mod debug;
+mod jemalloc_stats;
+mod request_info;
 mod route;
 mod utils;
 
@@ -23,7 +24,9 @@ pub fn create_handlers(
         configuration.command_configuration(),
     )?);
 
-    routes.append(&mut debug::create_routes());
+    routes.append(&mut jemalloc_stats::create_routes());
+
+    routes.append(&mut request_info::create_routes());
 
     Ok(Arc::new(route::Router::new(routes)?))
 }
