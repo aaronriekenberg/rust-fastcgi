@@ -24,7 +24,7 @@ pub fn create_handlers(
         configuration.command_configuration(),
     )?);
 
-    routes.append(&mut jemalloc_stats::create_routes());
+    routes.append(&mut jemalloc_stats::create_routes()?);
 
     routes.append(&mut request_info::create_routes());
 

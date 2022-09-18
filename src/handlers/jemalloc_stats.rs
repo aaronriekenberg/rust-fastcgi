@@ -3,6 +3,8 @@ use std::sync::{
     Arc,
 };
 
+use anyhow::Context;
+
 use async_trait::async_trait;
 
 use serde::Serialize;
@@ -21,14 +23,16 @@ struct JemallocEpochController {
 }
 
 impl JemallocEpochController {
-    fn new() -> Arc<Self> {
-        let epoch_mib = tikv_jemalloc_ctl::epoch::mib().unwrap();
-        let epoch_number = epoch_mib.advance().unwrap();
+    fn new() -> anyhow::Result<Arc<Self>> {
+        let epoch_mib =
+            tikv_jemalloc_ctl::epoch::mib().context("tikv_jemalloc_ctl::epoch::mib error")?;
 
-        Arc::new(Self {
+        let epoch_number = epoch_mib.advance().context("epoch_mib.advance error")?;
+
+        Ok(Arc::new(Self {
             epoch_mib,
             epoch_number: AtomicU64::new(epoch_number),
-        })
+        }))
     }
 
     fn start_epoch_updates(self: &Arc<Self>) {
@@ -38,9 +42,10 @@ impl JemallocEpochController {
             let duration = tokio::time::Duration::from_secs(EPOCH_INTERVAL_SECONDS);
             loop {
                 tokio::time::sleep(duration).await;
-                self_clone
-                    .epoch_number
-                    .store(self_clone.epoch_mib.advance().unwrap(), Ordering::Relaxed);
+                self_clone.epoch_number.store(
+                    self_clone.epoch_mib.advance().unwrap_or(0),
+                    Ordering::Relaxed,
+                );
             }
         });
     }
@@ -65,23 +70,26 @@ struct JemallocStatsHandler {
 }
 
 impl JemallocStatsHandler {
-    fn new(epoch_controller: Arc<JemallocEpochController>) -> Self {
-        let allocated = tikv_jemalloc_ctl::stats::allocated::mib().unwrap();
-        let resident = tikv_jemalloc_ctl::stats::resident::mib().unwrap();
+    fn new(epoch_controller: Arc<JemallocEpochController>) -> anyhow::Result<Self> {
+        let allocated = tikv_jemalloc_ctl::stats::allocated::mib()
+            .context("tikv_jemalloc_ctl::stats::allocated::mib")?;
 
-        Self {
+        let resident = tikv_jemalloc_ctl::stats::resident::mib()
+            .context("tikv_jemalloc_ctl::stats::resident::mib")?;
+
+        Ok(Self {
             allocated,
             resident,
             epoch_controller,
-        }
+        })
     }
 }
 
 #[async_trait]
 impl RequestHandler for JemallocStatsHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
-        let allocated_bytes = self.allocated.read().unwrap();
-        let resident_bytes = self.resident.read().unwrap();
+        let allocated_bytes = self.allocated.read().unwrap_or(0);
+        let resident_bytes = self.resident.read().unwrap_or(0);
 
         let response = JemallocStatsResponse {
             allocated_bytes,
@@ -94,12 +102,12 @@ impl RequestHandler for JemallocStatsHandler {
     }
 }
 
-pub fn create_routes() -> Vec<URIAndHandler> {
-    let epoch_controller = JemallocEpochController::new();
+pub fn create_routes() -> anyhow::Result<Vec<URIAndHandler>> {
+    let epoch_controller = JemallocEpochController::new()?;
     epoch_controller.start_epoch_updates();
 
-    vec![(
+    Ok(vec![(
         "/cgi-bin/jemalloc_stats".to_string(),
-        Box::new(JemallocStatsHandler::new(epoch_controller)),
-    )]
+        Box::new(JemallocStatsHandler::new(epoch_controller)?),
+    )])
 }
