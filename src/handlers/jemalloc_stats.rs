@@ -93,7 +93,7 @@ impl JemallocStatsHandler {
             .context("tikv_jemalloc_ctl::thread::allocatedp::mib")?;
 
         let thread_deallocatedp = tikv_jemalloc_ctl::thread::deallocatedp::mib()
-            .context("tikv_jemalloc_ctl::thread::allocatedp::mib")?;
+            .context("tikv_jemalloc_ctl::thread::deallocatedp::mib")?;
 
         let jemalloc_version =
             tikv_jemalloc_ctl::version::read().context("tikv_jemalloc_ctl::version::read")?;
