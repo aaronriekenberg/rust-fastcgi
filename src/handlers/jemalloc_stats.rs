@@ -59,16 +59,18 @@ impl JemallocEpochController {
 struct JemallocStatsResponse {
     allocated_bytes: usize,
     resident_bytes: usize,
-    jemalloc_version: &'static str,
+    num_arenas: u32,
     epoch_interval_seconds: u64,
     epoch_number: u64,
+    jemalloc_version: &'static str,
 }
 
 struct JemallocStatsHandler {
     allocated: tikv_jemalloc_ctl::stats::allocated_mib,
     resident: tikv_jemalloc_ctl::stats::resident_mib,
-    jemalloc_version: &'static str,
+    narenas: tikv_jemalloc_ctl::arenas::narenas_mib,
     epoch_controller: Arc<JemallocEpochController>,
+    jemalloc_version: &'static str,
 }
 
 impl JemallocStatsHandler {
@@ -79,14 +81,19 @@ impl JemallocStatsHandler {
         let resident = tikv_jemalloc_ctl::stats::resident::mib()
             .context("tikv_jemalloc_ctl::stats::resident::mib")?;
 
+
+        let narenas = tikv_jemalloc_ctl::arenas::narenas::mib()
+        .context("tikv_jemalloc_ctl::arenas::narenas::mib")?;
+
         let jemalloc_version =
             tikv_jemalloc_ctl::version::read().context("tikv_jemalloc_ctl::version::read")?;
 
         Ok(Self {
             allocated,
             resident,
-            jemalloc_version,
+            narenas,
             epoch_controller,
+            jemalloc_version,
         })
     }
 }
@@ -96,13 +103,15 @@ impl RequestHandler for JemallocStatsHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
         let allocated_bytes = self.allocated.read().unwrap_or(0);
         let resident_bytes = self.resident.read().unwrap_or(0);
+        let num_arenas = self.narenas.read().unwrap_or(0);
 
         let response = JemallocStatsResponse {
             allocated_bytes,
             resident_bytes,
-            jemalloc_version: self.jemalloc_version,
+            num_arenas,
             epoch_interval_seconds: EPOCH_INTERVAL_SECONDS,
             epoch_number: self.epoch_controller.get_epoch_number(),
+            jemalloc_version: self.jemalloc_version,
         };
 
         build_json_response(response)
