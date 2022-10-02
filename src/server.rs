@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 use anyhow::Context;
 
@@ -11,11 +14,14 @@ use tokio::net::{
 
 use tokio_fastcgi::Requests;
 
-use crate::{handlers::RequestHandler, request::FastCGIRequest, response::send_response};
+use crate::{
+    handlers::RequestHandler, request::FastCGIRequest, request::RequestID, response::send_response,
+};
 
 pub struct Server {
     server_configuration: crate::config::ServerConfiguration,
     handlers: Arc<dyn RequestHandler>,
+    next_connection_id: AtomicU64,
 }
 
 impl Server {
@@ -26,6 +32,7 @@ impl Server {
         Self {
             server_configuration: server_configuration.clone(),
             handlers,
+            next_connection_id: AtomicU64::new(1),
         }
     }
 
@@ -51,6 +58,8 @@ impl Server {
 
         let conn_handlers = Arc::clone(&self.handlers);
 
+        let connection_id = self.next_connection_id.fetch_add(1, Ordering::Relaxed);
+
         let max_concurrent_connections = *self.server_configuration.max_concurrent_connections();
         let max_requests_per_connection = *self.server_configuration.max_requests_per_connection();
 
@@ -71,7 +80,9 @@ impl Server {
 
                 if let Err(err) = request
                     .process(|request| async move {
-                        let fastcgi_request = FastCGIRequest::from(request.as_ref());
+                        let request_id = RequestID::new(connection_id, request.get_request_id());
+
+                        let fastcgi_request = FastCGIRequest::from((request_id, request.as_ref()));
 
                         let response = request_handlers.handle(fastcgi_request).await;
 

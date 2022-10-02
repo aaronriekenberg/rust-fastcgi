@@ -12,8 +12,9 @@ use crate::handlers::{
 
 #[derive(Debug, Default, Serialize)]
 struct RequestInfoResponse<'a> {
-    role: &'a str,
-    request_id: u16,
+    fastcgi_role: &'a str,
+    fastcgi_connection_id: u64,
+    fastcgi_request_id: u16,
     request_uri: &'a str,
     http_headers: BTreeMap<&'a str, &'a str>,
     other_params: BTreeMap<&'a str, &'a str>,
@@ -31,8 +32,9 @@ impl RequestInfoHandler {
 impl RequestHandler for RequestInfoHandler {
     async fn handle(&self, request: FastCGIRequest<'_>) -> HttpResponse {
         let mut response = RequestInfoResponse {
-            role: request.role(),
-            request_id: *request.request_id(),
+            fastcgi_role: request.role(),
+            fastcgi_connection_id: *request.request_id().fastcgi_connection_id(),
+            fastcgi_request_id: *request.request_id().fastcgi_request_id(),
             request_uri: request.request_uri().unwrap_or("[Unknown URI]"),
             ..Default::default()
         };
