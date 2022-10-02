@@ -33,17 +33,20 @@ where
         Self { request, response }
     }
 
-    fn build_header_string(&self, response: &HttpResponse) -> Result<String, std::fmt::Error> {
+    fn build_header_string(&self) -> Result<String, std::fmt::Error> {
         let mut header_string = String::new();
 
         write!(
             header_string,
             "Status: {} {}\n",
-            response.status().as_u16(),
-            response.status().canonical_reason().unwrap_or("[Unknown]")
+            self.response.status().as_u16(),
+            self.response
+                .status()
+                .canonical_reason()
+                .unwrap_or("[Unknown]")
         )?;
 
-        for (key, value) in response.headers() {
+        for (key, value) in self.response.headers() {
             write!(
                 header_string,
                 "{}: {}\n",
@@ -60,7 +63,7 @@ where
     async fn internal_send_response(self) -> Result<(), SendResponseError> {
         let mut stdout = self.request.get_stdout();
 
-        let header_string = self.build_header_string(&self.response)?;
+        let header_string = self.build_header_string()?;
 
         stdout.write(&header_string.into_bytes()).await?;
 
