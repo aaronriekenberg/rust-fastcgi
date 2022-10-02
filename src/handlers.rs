@@ -1,5 +1,4 @@
 mod commands;
-mod jemalloc_stats;
 mod request_info;
 mod route;
 mod utils;
@@ -23,8 +22,6 @@ pub fn create_handlers(
     routes.append(&mut commands::create_routes(
         configuration.command_configuration(),
     )?);
-
-    routes.append(&mut jemalloc_stats::create_routes()?);
 
     routes.append(&mut request_info::create_routes());
 

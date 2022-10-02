@@ -4,16 +4,11 @@ use anyhow::Context;
 
 use log::error;
 
-use tikv_jemallocator::Jemalloc;
-
 mod config;
 mod handlers;
 mod request;
 mod response;
 mod server;
-
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
 
 async fn try_main() -> anyhow::Result<()> {
     env_logger::builder().format_timestamp_nanos().init();
