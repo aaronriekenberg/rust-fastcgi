@@ -29,10 +29,13 @@ pub struct FastCGIRequest<'a> {
     params: Vec<ParamKeyValue<'a>>,
 }
 
-impl<'a, W: AsyncWrite + Unpin> From<(FastCGIRequestID, &'a tokio_fastcgi::Request<W>)>
-    for FastCGIRequest<'a>
+impl<'a, W> From<(FastCGIRequestID, &'a tokio_fastcgi::Request<W>)> for FastCGIRequest<'a>
+where
+    W: AsyncWrite + Unpin,
 {
-    fn from(id_and_request: (FastCGIRequestID, &'a tokio_fastcgi::Request<W>)) -> FastCGIRequest<'a> {
+    fn from(
+        id_and_request: (FastCGIRequestID, &'a tokio_fastcgi::Request<W>),
+    ) -> FastCGIRequest<'a> {
         let (request_id, request) = id_and_request;
 
         let role = match request.role {
