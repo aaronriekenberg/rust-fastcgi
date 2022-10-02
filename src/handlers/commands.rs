@@ -23,7 +23,7 @@ use crate::handlers::{
 };
 
 fn current_time_string() -> String {
-    Local::now().format("%Y-%m-%d %H:%M:%S%.9f %z").to_string()
+    Local::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
 struct AllCommandsHandler {
