@@ -17,7 +17,7 @@ use tokio_fastcgi::Requests;
 use crate::{
     handlers::RequestHandler,
     request::{FastCGIRequest, FastCGIRequestID},
-    response::send_response,
+    response::Responder,
 };
 
 pub struct Server {
@@ -87,9 +87,11 @@ impl Server {
 
                         let fastcgi_request = FastCGIRequest::from((request_id, request.as_ref()));
 
-                        let response = request_handlers.handle(fastcgi_request).await;
+                        let http_response = request_handlers.handle(fastcgi_request).await;
 
-                        send_response(request, response).await
+                        let responder = Responder::new(request, http_response);
+
+                        responder.respond().await
                     })
                     .await
                 {
