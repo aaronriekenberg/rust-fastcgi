@@ -15,7 +15,9 @@ use tokio::net::{
 use tokio_fastcgi::Requests;
 
 use crate::{
-    handlers::RequestHandler, request::FastCGIRequest, request::RequestID, response::send_response,
+    handlers::RequestHandler,
+    request::{FastCGIRequest, FastCGIRequestID},
+    response::send_response,
 };
 
 pub struct Server {
@@ -80,7 +82,8 @@ impl Server {
 
                 if let Err(err) = request
                     .process(|request| async move {
-                        let request_id = RequestID::new(connection_id, request.get_request_id());
+                        let request_id =
+                            FastCGIRequestID::new(connection_id, request.get_request_id());
 
                         let fastcgi_request = FastCGIRequest::from((request_id, request.as_ref()));
 

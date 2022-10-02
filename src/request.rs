@@ -4,16 +4,16 @@ use tokio::io::AsyncWrite;
 
 #[derive(Debug, Getters)]
 #[getset(get = "pub")]
-pub struct RequestID {
-    fastcgi_connection_id: u64,
-    fastcgi_request_id: u16,
+pub struct FastCGIRequestID {
+    connection_id: u64,
+    request_id: u16,
 }
 
-impl RequestID {
-    pub fn new(fastcgi_connection_id: u64, fastcgi_request_id: u16) -> Self {
+impl FastCGIRequestID {
+    pub fn new(connection_id: u64, request_id: u16) -> Self {
         Self {
-            fastcgi_connection_id,
-            fastcgi_request_id,
+            connection_id,
+            request_id,
         }
     }
 }
@@ -24,15 +24,15 @@ pub type ParamKeyValue<'a> = (&'a str, &'a str);
 #[getset(get = "pub")]
 pub struct FastCGIRequest<'a> {
     role: &'a str,
-    request_id: RequestID,
+    request_id: FastCGIRequestID,
     request_uri: Option<&'a str>,
     params: Vec<ParamKeyValue<'a>>,
 }
 
-impl<'a, W: AsyncWrite + Unpin> From<(RequestID, &'a tokio_fastcgi::Request<W>)>
+impl<'a, W: AsyncWrite + Unpin> From<(FastCGIRequestID, &'a tokio_fastcgi::Request<W>)>
     for FastCGIRequest<'a>
 {
-    fn from(id_and_request: (RequestID, &'a tokio_fastcgi::Request<W>)) -> FastCGIRequest<'a> {
+    fn from(id_and_request: (FastCGIRequestID, &'a tokio_fastcgi::Request<W>)) -> FastCGIRequest<'a> {
         let (request_id, request) = id_and_request;
 
         let role = match request.role {
