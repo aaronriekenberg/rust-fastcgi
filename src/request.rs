@@ -4,7 +4,8 @@ use tokio::io::AsyncWrite;
 
 use crate::connection::FastCGIConnectionID;
 
-pub type FastCGIRequestID = u16;
+#[derive(Clone, Copy, Debug)]
+pub struct FastCGIRequestID(pub u16);
 
 pub type ParamKeyValue<'a> = (&'a str, &'a str);
 
@@ -26,7 +27,7 @@ impl<'a> FastCGIRequest<'a> {
     where
         W: AsyncWrite + Unpin,
     {
-        let request_id = request.get_request_id();
+        let request_id = FastCGIRequestID(request.get_request_id());
 
         let role = match request.role {
             tokio_fastcgi::Role::Authorizer => "Authorizer",
