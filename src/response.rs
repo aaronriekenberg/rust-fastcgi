@@ -60,7 +60,7 @@ where
         Ok(header_string)
     }
 
-    async fn internal_send_response(self) -> Result<(), SendResponseError> {
+    async fn send_response(self) -> Result<(), SendResponseError> {
         let mut stdout = self.request.get_stdout();
 
         let header_string = self.build_header_string()?;
@@ -77,7 +77,7 @@ where
     pub async fn respond(self) -> RequestResult {
         debug!("respond response = {:?}", self.response);
 
-        match self.internal_send_response().await {
+        match self.send_response().await {
             Ok(_) => RequestResult::Complete(0),
             Err(err) => {
                 warn!("send response failed: {}", err);
