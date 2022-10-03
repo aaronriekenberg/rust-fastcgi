@@ -1,7 +1,4 @@
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use anyhow::Context;
 
@@ -15,15 +12,14 @@ use tokio::net::{
 use tokio_fastcgi::Requests;
 
 use crate::{
-    handlers::RequestHandler,
-    request::{FastCGIRequest, FastCGIRequestID},
+    connection::FastCGIConnectionIDFactory, handlers::RequestHandler, request::FastCGIRequest,
     response::Responder,
 };
 
 pub struct Server {
     server_configuration: crate::config::ServerConfiguration,
     handlers: Arc<dyn RequestHandler>,
-    next_connection_id: AtomicU64,
+    connection_id_factory: FastCGIConnectionIDFactory,
 }
 
 impl Server {
@@ -34,7 +30,7 @@ impl Server {
         Self {
             server_configuration: server_configuration.clone(),
             handlers,
-            next_connection_id: AtomicU64::new(1),
+            connection_id_factory: FastCGIConnectionIDFactory::new(),
         }
     }
 
@@ -60,7 +56,7 @@ impl Server {
 
         let conn_handlers = Arc::clone(&self.handlers);
 
-        let connection_id = self.next_connection_id.fetch_add(1, Ordering::Relaxed);
+        let connection_id = self.connection_id_factory.new_connection_id();
 
         let max_concurrent_connections = *self.server_configuration.max_concurrent_connections();
         let max_requests_per_connection = *self.server_configuration.max_requests_per_connection();
@@ -82,16 +78,11 @@ impl Server {
 
                 if let Err(err) = request
                     .process(|request| async move {
-                        let request_id =
-                            FastCGIRequestID::new(connection_id, request.get_request_id());
-
-                        let fastcgi_request = FastCGIRequest::from((request_id, request.as_ref()));
+                        let fastcgi_request = FastCGIRequest::new(connection_id, request.as_ref());
 
                         let http_response = request_handlers.handle(fastcgi_request).await;
 
-                        let responder = Responder::new(request, http_response);
-
-                        responder.respond().await
+                        Responder::new(request, http_response).respond().await
                     })
                     .await
                 {

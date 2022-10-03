@@ -5,6 +5,7 @@ use anyhow::Context;
 use log::error;
 
 mod config;
+mod connection;
 mod handlers;
 mod request;
 mod response;

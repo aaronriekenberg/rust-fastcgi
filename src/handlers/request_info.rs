@@ -4,10 +4,12 @@ use async_trait::async_trait;
 
 use serde::Serialize;
 
-use crate::handlers::{
-    route::URIAndHandler,
-    utils::build_json_response,
-    {FastCGIRequest, HttpResponse, RequestHandler},
+use crate::{
+    handlers::{
+        route::URIAndHandler,
+        utils::build_json_response,
+        {FastCGIRequest, HttpResponse, RequestHandler},
+    },
 };
 
 #[derive(Debug, Default, Serialize)]
@@ -33,8 +35,8 @@ impl RequestHandler for RequestInfoHandler {
     async fn handle(&self, request: FastCGIRequest<'_>) -> HttpResponse {
         let mut response = RequestInfoResponse {
             fastcgi_role: request.role(),
-            fastcgi_connection_id: *request.request_id().connection_id(),
-            fastcgi_request_id: *request.request_id().request_id(),
+            fastcgi_connection_id: request.connection_id().0,
+            fastcgi_request_id: *request.request_id(),
             request_uri: request.request_uri().unwrap_or("[Unknown URI]"),
             ..Default::default()
         };
