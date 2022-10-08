@@ -65,17 +65,16 @@ impl Server {
 
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
-        tokio::spawn(async move {
-            ConnectionProcessor::new(
+        tokio::spawn(
+            ServerConnectionProcessor::new(
                 stream,
                 connection_id,
                 conn_handlers,
                 max_concurrent_connections,
                 max_requests_per_connection,
             )
-            .process()
-            .await;
-        });
+            .run(),
+        );
     }
 
     pub async fn run(self) -> anyhow::Result<()> {
@@ -99,7 +98,7 @@ impl Server {
     }
 }
 
-struct ConnectionProcessor {
+struct ServerConnectionProcessor {
     connection_id: FastCGIConnectionID,
     stream: UnixStream,
     handlers: Arc<dyn RequestHandler>,
@@ -107,7 +106,7 @@ struct ConnectionProcessor {
     max_requests_per_connection: u8,
 }
 
-impl ConnectionProcessor {
+impl ServerConnectionProcessor {
     fn new(
         stream: UnixStream,
         connection_id: FastCGIConnectionID,
@@ -124,7 +123,7 @@ impl ConnectionProcessor {
         }
     }
 
-    async fn process(self) {
+    async fn run(self) {
         // Create a new requests handler it will collect the requests from the server and
         // supply a streaming interface.
         let mut requests = Requests::from_split_socket(
@@ -137,22 +136,20 @@ impl ConnectionProcessor {
         while let Ok(Some(request)) = requests.next().await {
             let request_handlers = Arc::clone(&self.handlers);
 
-            tokio::spawn(async move {
-                RequestProcessor::new(self.connection_id, request, request_handlers)
-                    .process()
-                    .await;
-            });
+            tokio::spawn(
+                ServerRequestProcessor::new(self.connection_id, request, request_handlers).run(),
+            );
         }
     }
 }
 
-struct RequestProcessor {
+struct ServerRequestProcessor {
     connection_id: FastCGIConnectionID,
     request: tokio_fastcgi::Request<OwnedWriteHalf>,
     handlers: Arc<dyn RequestHandler>,
 }
 
-impl RequestProcessor {
+impl ServerRequestProcessor {
     fn new(
         connection_id: FastCGIConnectionID,
         request: tokio_fastcgi::Request<OwnedWriteHalf>,
@@ -165,7 +162,7 @@ impl RequestProcessor {
         }
     }
 
-    async fn process(self) {
+    async fn run(self) {
         if let Err(err) = self
             .request
             .process(|request| async move {
