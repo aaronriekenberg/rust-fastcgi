@@ -137,9 +137,11 @@ impl ConnectionProcessor {
         while let Ok(Some(request)) = requests.next().await {
             let request_handlers = Arc::clone(&self.handlers);
 
-            RequestProcessor::new(self.connection_id, request, request_handlers)
-                .process()
-                .await;
+            tokio::spawn(async move {
+                RequestProcessor::new(self.connection_id, request, request_handlers)
+                    .process()
+                    .await;
+            });
         }
     }
 }
