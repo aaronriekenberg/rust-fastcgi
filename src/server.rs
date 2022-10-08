@@ -5,14 +5,16 @@ use anyhow::Context;
 use log::{debug, info, warn};
 
 use tokio::net::{
-    unix::SocketAddr,
+    unix::{OwnedWriteHalf, SocketAddr},
     {UnixListener, UnixStream},
 };
 
 use tokio_fastcgi::Requests;
 
 use crate::{
-    connection::FastCGIConnectionIDFactory, handlers::RequestHandler, request::FastCGIRequest,
+    connection::{FastCGIConnectionID, FastCGIConnectionIDFactory},
+    handlers::RequestHandler,
+    request::FastCGIRequest,
     response::Responder,
 };
 
@@ -64,32 +66,15 @@ impl Server {
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
         tokio::spawn(async move {
-            // Create a new requests handler it will collect the requests from the server and
-            // supply a streaming interface.
-            let mut requests = Requests::from_split_socket(
-                stream.into_split(),
+            ConnectionProcessor::new(
+                stream,
+                connection_id,
+                conn_handlers,
                 max_concurrent_connections,
                 max_requests_per_connection,
-            );
-
-            // Loop over the requests via the next method and process them.
-            while let Ok(Some(request)) = requests.next().await {
-                let request_handlers = Arc::clone(&conn_handlers);
-
-                if let Err(err) = request
-                    .process(|request| async move {
-                        let fastcgi_request = FastCGIRequest::new(connection_id, request.as_ref());
-
-                        let http_response = request_handlers.handle(fastcgi_request).await;
-
-                        Responder::new(request, http_response).respond().await
-                    })
-                    .await
-                {
-                    // This is the error handler that is called if the process call returns an error.
-                    warn!("request.process failed: err = {}", err,);
-                }
-            }
+            )
+            .process()
+            .await;
         });
     }
 
@@ -110,6 +95,88 @@ impl Server {
                     self.handle_connection(stream, address);
                 }
             }
+        }
+    }
+}
+
+struct ConnectionProcessor {
+    connection_id: FastCGIConnectionID,
+    stream: UnixStream,
+    handlers: Arc<dyn RequestHandler>,
+    max_concurrent_connections: u8,
+    max_requests_per_connection: u8,
+}
+
+impl ConnectionProcessor {
+    fn new(
+        stream: UnixStream,
+        connection_id: FastCGIConnectionID,
+        handlers: Arc<dyn RequestHandler>,
+        max_concurrent_connections: u8,
+        max_requests_per_connection: u8,
+    ) -> Self {
+        Self {
+            stream,
+            connection_id,
+            handlers,
+            max_concurrent_connections,
+            max_requests_per_connection,
+        }
+    }
+
+    async fn process(self) {
+        // Create a new requests handler it will collect the requests from the server and
+        // supply a streaming interface.
+        let mut requests = Requests::from_split_socket(
+            self.stream.into_split(),
+            self.max_concurrent_connections,
+            self.max_requests_per_connection,
+        );
+
+        // Loop over the requests via the next method and process them.
+        while let Ok(Some(request)) = requests.next().await {
+            let request_handlers = Arc::clone(&self.handlers);
+
+            RequestProcessor::new(self.connection_id, request, request_handlers)
+                .process()
+                .await;
+        }
+    }
+}
+
+struct RequestProcessor {
+    connection_id: FastCGIConnectionID,
+    request: tokio_fastcgi::Request<OwnedWriteHalf>,
+    handlers: Arc<dyn RequestHandler>,
+}
+
+impl RequestProcessor {
+    fn new(
+        connection_id: FastCGIConnectionID,
+        request: tokio_fastcgi::Request<OwnedWriteHalf>,
+        handlers: Arc<dyn RequestHandler>,
+    ) -> Self {
+        Self {
+            connection_id,
+            request,
+            handlers,
+        }
+    }
+
+    async fn process(self) {
+        if let Err(err) = self
+            .request
+            .process(|request| async move {
+                let fastcgi_request = FastCGIRequest::new(self.connection_id, request.as_ref());
+
+                let http_response = self.handlers.handle(fastcgi_request).await;
+
+                Responder::new(request, http_response).respond().await
+            })
+            .await
+        {
+            // This is the error handler that is called if the process call returns an error.
+            warn!("request.process failed: err = {}", err,);
         }
     }
 }
