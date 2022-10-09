@@ -1,6 +1,7 @@
 {
     "server_configuration": {
-        "socket_path": "/var/www/run/go-fastcgi/socket",
+        "server_type": "UNIX",
+        "bind_address": "/var/www/run/go-fastcgi/socket",
         "max_concurrent_connections": 10,
         "max_requests_per_connection": 10
     },

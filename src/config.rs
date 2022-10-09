@@ -8,10 +8,17 @@ use serde::{Deserialize, Serialize};
 
 use tokio::{fs::File, io::AsyncReadExt};
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum ServerType {
+    TCP,
+    UNIX,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct ServerConfiguration {
-    socket_path: String,
+    server_type: ServerType,
+    bind_address: String,
     max_concurrent_connections: u8,
     max_requests_per_connection: u8,
 }

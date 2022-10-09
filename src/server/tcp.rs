@@ -1,15 +1,13 @@
 use async_trait::async_trait;
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Context;
 
 use log::{debug, info};
 
-use tokio::net::{
-    unix::SocketAddr,
-    {UnixListener, UnixStream},
-};
+use tokio::net::{TcpListener, TcpStream};
 
 use tokio_fastcgi::Requests;
 
@@ -18,13 +16,13 @@ use crate::{
     handlers::RequestHandler,
 };
 
-pub struct UnixServer {
+pub struct TcpServer {
     server_configuration: crate::config::ServerConfiguration,
     handlers: Arc<dyn RequestHandler>,
     connection_id_factory: FastCGIConnectionIDFactory,
 }
 
-impl UnixServer {
+impl TcpServer {
     pub fn new(
         server_configuration: &crate::config::ServerConfiguration,
         handlers: Arc<dyn RequestHandler>,
@@ -36,24 +34,21 @@ impl UnixServer {
         }
     }
 
-    async fn create_listener(&self) -> anyhow::Result<UnixListener> {
+    async fn create_listener(&self) -> anyhow::Result<TcpListener> {
         let bind_address = self.server_configuration.bind_address();
 
-        // do not fail on remove error, the path may not exist.
-        let remove_result = tokio::fs::remove_file(bind_address).await;
-        debug!("remove_result = {:?}", remove_result);
-
-        let listener = UnixListener::bind(bind_address)
-            .with_context(|| format!("UnixListener::bind error path '{}'", bind_address))?;
+        let listener = TcpListener::bind(bind_address)
+            .await
+            .with_context(|| format!("TcpListener::bind error bind_address '{}'", bind_address))?;
 
         let local_addr = listener.local_addr().context("local_addr error")?;
 
-        info!("UnixServer listening on {:?}", local_addr);
+        info!("TcpServer listening on {:?}", local_addr);
 
         Ok(listener)
     }
 
-    fn handle_connection(&self, stream: UnixStream, address: SocketAddr) {
+    fn handle_connection(&self, stream: TcpStream, address: SocketAddr) {
         debug!("connection from {:?}", address);
 
         let connection_id = self.connection_id_factory.new_connection_id();
@@ -61,7 +56,7 @@ impl UnixServer {
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
         tokio::spawn(
-            UnixServerConnectionProcessor::new(
+            TcpServerConnectionProcessor::new(
                 stream,
                 connection_id,
                 Arc::clone(&self.handlers),
@@ -74,12 +69,12 @@ impl UnixServer {
 }
 
 #[async_trait]
-impl super::SocketServer for UnixServer {
+impl super::SocketServer for TcpServer {
     async fn run(&self) -> anyhow::Result<()> {
         let listener = self
             .create_listener()
             .await
-            .context("UnixServer::create_listener error")?;
+            .context("TcpServer::create_listener error")?;
 
         loop {
             let connection = listener.accept().await;
@@ -96,17 +91,17 @@ impl super::SocketServer for UnixServer {
     }
 }
 
-struct UnixServerConnectionProcessor {
+struct TcpServerConnectionProcessor {
     connection_id: FastCGIConnectionID,
-    stream: UnixStream,
+    stream: TcpStream,
     handlers: Arc<dyn RequestHandler>,
     max_concurrent_connections: u8,
     max_requests_per_connection: u8,
 }
 
-impl UnixServerConnectionProcessor {
+impl TcpServerConnectionProcessor {
     fn new(
-        stream: UnixStream,
+        stream: TcpStream,
         connection_id: FastCGIConnectionID,
         handlers: Arc<dyn RequestHandler>,
         max_concurrent_connections: u8,
