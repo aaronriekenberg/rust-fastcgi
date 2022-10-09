@@ -61,15 +61,15 @@ where
     }
 
     async fn send_response(self) -> Result<(), SendResponseError> {
-        let mut stdout = self.request.get_stdout();
-
         let header_string = self.build_header_string()?;
 
-        stdout.write(&header_string.into_bytes()).await?;
+        let mut write_buffer = header_string.into_bytes();
 
         if let Some(body_string) = self.response.into_body() {
-            stdout.write(&body_string.into_bytes()).await?;
+            write_buffer.append(&mut body_string.into_bytes());
         }
+
+        self.request.get_stdout().write(&write_buffer).await?;
 
         Ok(())
     }
