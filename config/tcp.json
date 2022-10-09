@@ -1,0 +1,32 @@
+{
+    "server_configuration": {
+        "server_type": "TCP",
+        "bind_address": "127.0.0.1:10082",
+        "max_concurrent_connections": 10,
+        "max_requests_per_connection": 10
+    },
+    "command_configuration": {
+        "max_concurrent_commands": 1,
+        "semaphore_acquire_timeout_millis": 200,
+        "commands": [
+            {
+                "id": "sleep",
+                "description": "sleep",
+                "command": "/bin/sleep",
+                "args": [
+                    "5"
+                ]
+            },
+            {
+                "id": "vmstat",
+                "description": "vmstat",
+                "command": "/usr/bin/vmstat"
+            },
+            {
+                "id": "w",
+                "description": "w",
+                "command": "/usr/bin/w"
+            }
+        ]
+    }
+}
