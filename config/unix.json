@@ -2,8 +2,10 @@
     "server_configuration": {
         "server_type": "UNIX",
         "bind_address": "./socket",
-        "max_concurrent_connections": 10,
-        "max_requests_per_connection": 10
+        "fastcgi_connection_configuration": {
+            "max_concurrent_connections": 10,
+            "max_requests_per_connection": 10
+        }
     },
     "command_configuration": {
         "max_concurrent_commands": 1,

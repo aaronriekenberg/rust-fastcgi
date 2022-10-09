@@ -2,8 +2,10 @@
     "server_configuration": {
         "server_type": "TCP",
         "bind_address": "127.0.0.1:10082",
-        "max_concurrent_connections": 10,
-        "max_requests_per_connection": 10
+        "fastcgi_connection_configuration": {
+            "max_concurrent_connections": 10,
+            "max_requests_per_connection": 10
+        }
     },
     "command_configuration": {
         "max_concurrent_commands": 1,

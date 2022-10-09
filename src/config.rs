@@ -16,11 +16,17 @@ pub enum ServerType {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
+pub struct FastCGIConnectionConfiguration {
+    max_concurrent_connections: u8,
+    max_requests_per_connection: u8,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[getset(get = "pub")]
 pub struct ServerConfiguration {
     server_type: ServerType,
     bind_address: String,
-    max_concurrent_connections: u8,
-    max_requests_per_connection: u8,
+    fastcgi_connection_configuration: FastCGIConnectionConfiguration,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
