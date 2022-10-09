@@ -4,9 +4,12 @@ use anyhow::Context;
 
 use log::{debug, info, warn};
 
-use tokio::net::{
-    unix::{OwnedWriteHalf, SocketAddr},
-    {UnixListener, UnixStream},
+use tokio::{
+    io::AsyncWrite,
+    net::{
+        unix::SocketAddr,
+        {UnixListener, UnixStream},
+    },
 };
 
 use tokio_fastcgi::Requests;
@@ -141,16 +144,22 @@ impl ServerConnectionProcessor {
     }
 }
 
-struct ServerRequestProcessor {
+struct ServerRequestProcessor<W>
+where
+    W: AsyncWrite + Unpin,
+{
     connection_id: FastCGIConnectionID,
-    request: tokio_fastcgi::Request<OwnedWriteHalf>,
+    request: tokio_fastcgi::Request<W>,
     handlers: Arc<dyn RequestHandler>,
 }
 
-impl ServerRequestProcessor {
+impl<W> ServerRequestProcessor<W>
+where
+    W: AsyncWrite + Unpin,
+{
     fn new(
         connection_id: FastCGIConnectionID,
-        request: tokio_fastcgi::Request<OwnedWriteHalf>,
+        request: tokio_fastcgi::Request<W>,
         handlers: Arc<dyn RequestHandler>,
     ) -> Self {
         Self {
