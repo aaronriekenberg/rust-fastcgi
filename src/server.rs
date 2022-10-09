@@ -56,12 +56,7 @@ impl Server {
     fn handle_connection(&self, stream: UnixStream, address: SocketAddr) {
         debug!("connection from {:?}", address);
 
-        let conn_handlers = Arc::clone(&self.handlers);
-
         let connection_id = self.connection_id_factory.new_connection_id();
-
-        let max_concurrent_connections = *self.server_configuration.max_concurrent_connections();
-        let max_requests_per_connection = *self.server_configuration.max_requests_per_connection();
 
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
@@ -69,9 +64,9 @@ impl Server {
             ServerConnectionProcessor::new(
                 stream,
                 connection_id,
-                conn_handlers,
-                max_concurrent_connections,
-                max_requests_per_connection,
+                Arc::clone(&self.handlers),
+                *self.server_configuration.max_concurrent_connections(),
+                *self.server_configuration.max_requests_per_connection(),
             )
             .run(),
         );
@@ -134,10 +129,13 @@ impl ServerConnectionProcessor {
 
         // Loop over the requests via the next method and process them.
         while let Ok(Some(request)) = requests.next().await {
-            let request_handlers = Arc::clone(&self.handlers);
-
             tokio::spawn(
-                ServerRequestProcessor::new(self.connection_id, request, request_handlers).run(),
+                ServerRequestProcessor::new(
+                    self.connection_id,
+                    request,
+                    Arc::clone(&self.handlers),
+                )
+                .run(),
             );
         }
     }
