@@ -9,12 +9,7 @@ use log::{debug, info};
 
 use tokio::net::{TcpListener, TcpStream};
 
-use tokio_fastcgi::Requests;
-
-use crate::{
-    connection::{FastCGIConnectionID, FastCGIConnectionIDFactory},
-    handlers::RequestHandler,
-};
+use crate::{connection::FastCGIConnectionIDFactory, handlers::RequestHandler};
 
 pub struct TcpServer {
     server_configuration: crate::config::ServerConfiguration,
@@ -56,13 +51,12 @@ impl TcpServer {
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
         tokio::spawn(
-            TcpServerConnectionProcessor::new(
-                stream,
+            super::ServerConnectionProcessor::new(
                 connection_id,
                 Arc::clone(&self.handlers),
-                &self.server_configuration.fastcgi_connection_configuration(),
+                self.server_configuration.fastcgi_connection_configuration(),
             )
-            .run(),
+            .run(stream.into_split()),
         );
     }
 }
@@ -86,51 +80,6 @@ impl super::SocketServer for TcpServer {
                     self.handle_connection(stream, address);
                 }
             }
-        }
-    }
-}
-
-struct TcpServerConnectionProcessor {
-    connection_id: FastCGIConnectionID,
-    stream: TcpStream,
-    handlers: Arc<dyn RequestHandler>,
-    connection_config: crate::config::FastCGIConnectionConfiguration,
-}
-
-impl TcpServerConnectionProcessor {
-    fn new(
-        stream: TcpStream,
-        connection_id: FastCGIConnectionID,
-        handlers: Arc<dyn RequestHandler>,
-        connection_config: &crate::config::FastCGIConnectionConfiguration,
-    ) -> Self {
-        Self {
-            stream,
-            connection_id,
-            handlers,
-            connection_config: connection_config.clone(),
-        }
-    }
-
-    async fn run(self) {
-        // Create a new requests handler it will collect the requests from the server and
-        // supply a streaming interface.
-        let mut requests = Requests::from_split_socket(
-            self.stream.into_split(),
-            *self.connection_config.max_concurrent_connections(),
-            *self.connection_config.max_requests_per_connection(),
-        );
-
-        // Loop over the requests via the next method and process them.
-        while let Ok(Some(request)) = requests.next().await {
-            tokio::spawn(
-                super::ServerRequestProcessor::new(
-                    self.connection_id,
-                    request,
-                    Arc::clone(&self.handlers),
-                )
-                .run(),
-            );
         }
     }
 }
