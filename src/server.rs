@@ -68,7 +68,7 @@ impl ServerConnectionProcessor {
 
     async fn process_one_request<W>(self: Arc<Self>, request: Request<W>)
     where
-        W: AsyncWrite + Unpin + Send + 'static,
+        W: AsyncWrite + Unpin,
     {
         if let Err(err) = request
             .process(|request| async move {
