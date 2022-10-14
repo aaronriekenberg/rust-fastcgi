@@ -9,7 +9,10 @@ use log::{debug, info};
 
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::{connection::FastCGIConnectionIDFactory, handlers::RequestHandler};
+use crate::{
+    connection::FastCGIConnectionIDFactory, handlers::RequestHandler,
+    server::processor::ConnectionProcessor,
+};
 
 pub struct TcpServer {
     server_configuration: crate::config::ServerConfiguration,
@@ -51,7 +54,7 @@ impl TcpServer {
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
         tokio::spawn(
-            super::ServerConnectionProcessor::new(
+            ConnectionProcessor::new(
                 connection_id,
                 Arc::clone(&self.handlers),
                 self.server_configuration.fastcgi_connection_configuration(),
