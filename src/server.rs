@@ -8,6 +8,10 @@ use std::sync::Arc;
 
 use crate::{config::ServerType, handlers::RequestHandler};
 
+use tcp::TcpServer;
+
+use unix::UnixServer;
+
 #[async_trait]
 trait SocketServer {
     async fn run(&self) -> anyhow::Result<()>;
@@ -24,10 +28,8 @@ impl Server {
     ) -> Self {
         Self {
             socket_server: match server_configuration.server_type() {
-                ServerType::TCP => Box::new(tcp::TcpServer::new(&server_configuration, handlers)),
-                ServerType::UNIX => {
-                    Box::new(unix::UnixServer::new(&server_configuration, handlers))
-                }
+                ServerType::TCP => Box::new(TcpServer::new(server_configuration, handlers)),
+                ServerType::UNIX => Box::new(UnixServer::new(server_configuration, handlers)),
             },
         }
     }
