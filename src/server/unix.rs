@@ -52,20 +52,16 @@ impl UnixServer {
     }
 
     fn handle_connection(&self, stream: UnixStream, address: SocketAddr) {
-        debug!("connection from {:?}", address);
-
         let connection_id = self.connection_id_factory.new_connection_id();
 
-        // If the socket connection was established successfully spawn a new task to handle
-        // the requests that the webserver will send us.
-        tokio::spawn(
-           ConnectionProcessor::new(
-                connection_id,
-                Arc::clone(&self.handlers),
-                self.server_configuration.fastcgi_connection_configuration(),
-            )
-            .run(stream.into_split()),
-        );
+        debug!("connection_id {:?} from {:?}", connection_id, address);
+
+        ConnectionProcessor::new(
+            connection_id,
+            Arc::clone(&self.handlers),
+            self.server_configuration.fastcgi_connection_configuration(),
+        )
+        .start(stream.into_split());
     }
 }
 

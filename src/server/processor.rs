@@ -45,10 +45,10 @@ impl ConnectionProcessor {
         }
     }
 
-    pub async fn run<R, W>(self: Arc<Self>, split_socket: (R, W))
+    async fn run<R, W>(self: Arc<Self>, split_socket: (R, W))
     where
-        R: GenericAsyncReader + Send + 'static,
-        W: GenericAsyncWriter + Send + 'static,
+        R: GenericAsyncReader + Send + Sync + 'static,
+        W: GenericAsyncWriter + Send + Sync + 'static,
     {
         // Create a new requests handler it will collect the requests from the server and
         // supply a streaming interface.
@@ -65,8 +65,17 @@ impl ConnectionProcessor {
         // Loop over the requests via the next method and process them.
         // Spawn a new task to process each request.
         while let Ok(Some(request)) = requests.next().await {
-            let self_clone = Arc::clone(&self);
-            tokio::spawn(self_clone.process_one_request(request));
+            tokio::spawn(Arc::clone(&self).process_one_request(request));
         }
+    }
+
+    pub fn start<R, W>(self: Arc<Self>, split_socket: (R, W))
+    where
+        R: GenericAsyncReader + Send + Sync + 'static,
+        W: GenericAsyncWriter + Send + Sync + 'static,
+    {
+        // If the socket connection was established successfully spawn a new task to handle
+        // the requests that the webserver will send us.
+        tokio::spawn(self.run(split_socket));
     }
 }
