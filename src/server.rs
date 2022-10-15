@@ -6,7 +6,7 @@ use async_trait::async_trait;
 
 use std::sync::Arc;
 
-use crate::handlers::RequestHandler;
+use crate::{config::ServerType, handlers::RequestHandler};
 
 #[async_trait]
 trait SocketServer {
@@ -22,16 +22,14 @@ impl Server {
         handlers: Arc<dyn RequestHandler>,
         server_configuration: &crate::config::ServerConfiguration,
     ) -> Self {
-        let socket_server: Box<dyn SocketServer> = match server_configuration.server_type() {
-            crate::config::ServerType::TCP => {
-                Box::new(tcp::TcpServer::new(&server_configuration, handlers))
-            }
-            crate::config::ServerType::UNIX => {
-                Box::new(unix::UnixServer::new(&server_configuration, handlers))
-            }
-        };
-
-        Self { socket_server }
+        Self {
+            socket_server: match server_configuration.server_type() {
+                ServerType::TCP => Box::new(tcp::TcpServer::new(&server_configuration, handlers)),
+                ServerType::UNIX => {
+                    Box::new(unix::UnixServer::new(&server_configuration, handlers))
+                }
+            },
+        }
     }
 
     pub async fn run(self) -> anyhow::Result<()> {
