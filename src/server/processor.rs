@@ -29,7 +29,7 @@ impl ConnectionProcessor {
         })
     }
 
-    async fn process_one_request<W: GenericAsyncWriter>(self: Arc<Self>, request: Request<W>) {
+    async fn process_one_request(self: Arc<Self>, request: Request<impl GenericAsyncWriter>) {
         if let Err(err) = request
             .process(|request| async move {
                 let fastcgi_request = FastCGIRequest::new(self.connection_id, request.as_ref());
