@@ -10,6 +10,7 @@ mod handlers;
 mod request;
 mod response;
 mod server;
+mod utils;
 
 async fn try_main() -> anyhow::Result<()> {
     env_logger::builder().format_timestamp_nanos().init();

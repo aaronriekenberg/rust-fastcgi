@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use log::warn;
 
-use tokio::io::{AsyncRead, AsyncWrite};
-
 use tokio_fastcgi::{Request, Requests};
+
+use crate::utils::{GenericAsyncReader, GenericAsyncWriter};
 
 use crate::{
     connection::FastCGIConnectionID, handlers::RequestHandler, request::FastCGIRequest,
@@ -29,10 +29,7 @@ impl ConnectionProcessor {
         })
     }
 
-    async fn process_one_request<W>(self: Arc<Self>, request: Request<W>)
-    where
-        W: AsyncWrite + Unpin,
-    {
+    async fn process_one_request<W: GenericAsyncWriter>(self: Arc<Self>, request: Request<W>) {
         if let Err(err) = request
             .process(|request| async move {
                 let fastcgi_request = FastCGIRequest::new(self.connection_id, request.as_ref());
@@ -50,8 +47,8 @@ impl ConnectionProcessor {
 
     pub async fn run<R, W>(self: Arc<Self>, split_socket: (R, W))
     where
-        R: AsyncRead + Unpin + Send + 'static,
-        W: AsyncWrite + Unpin + Send + 'static,
+        R: GenericAsyncReader + Send + 'static,
+        W: GenericAsyncWriter + Send + 'static,
     {
         // Create a new requests handler it will collect the requests from the server and
         // supply a streaming interface.

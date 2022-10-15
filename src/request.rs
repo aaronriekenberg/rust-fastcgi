@@ -1,8 +1,6 @@
 use getset::Getters;
 
-use tokio::io::AsyncWrite;
-
-use crate::connection::FastCGIConnectionID;
+use crate::{connection::FastCGIConnectionID, utils::GenericAsyncWriter};
 
 #[derive(Clone, Copy, Debug)]
 pub struct FastCGIRequestID(pub u16);
@@ -20,13 +18,10 @@ pub struct FastCGIRequest<'a> {
 }
 
 impl<'a> FastCGIRequest<'a> {
-    pub fn new<W>(
+    pub fn new(
         connection_id: FastCGIConnectionID,
-        request: &'a tokio_fastcgi::Request<W>,
-    ) -> FastCGIRequest<'a>
-    where
-        W: AsyncWrite + Unpin,
-    {
+        request: &'a tokio_fastcgi::Request<impl GenericAsyncWriter>,
+    ) -> FastCGIRequest<'a> {
         let request_id = FastCGIRequestID(request.get_request_id());
 
         let role = match request.role {

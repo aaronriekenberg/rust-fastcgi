@@ -2,9 +2,9 @@ use std::{fmt::Write, sync::Arc};
 
 use log::{debug, warn};
 
-use tokio::io::AsyncWrite;
-
 use tokio_fastcgi::{Request, RequestResult};
+
+use crate::utils::GenericAsyncWriter;
 
 pub type HttpResponse = http::Response<Option<String>>;
 
@@ -17,18 +17,12 @@ enum SendResponseError {
     TokioFastCGIWriteError(#[from] tokio_fastcgi::Error),
 }
 
-pub struct Responder<W>
-where
-    W: AsyncWrite + Unpin,
-{
+pub struct Responder<W: GenericAsyncWriter> {
     request: Arc<Request<W>>,
     response: HttpResponse,
 }
 
-impl<W> Responder<W>
-where
-    W: AsyncWrite + Unpin,
-{
+impl<W: GenericAsyncWriter> Responder<W> {
     pub fn new(request: Arc<Request<W>>, response: HttpResponse) -> Self {
         Self { request, response }
     }
