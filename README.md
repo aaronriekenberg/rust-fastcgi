@@ -44,7 +44,7 @@ RUST_LOG=debug ./target/debug/rust-fastcgi ./config/unix.json
 
 ## Some learnings:
 
-* Using `anyhow` and `thiserror` as opposed to `Box<dyn Error>`.  I like this and begin to understand the use case for 2 separate libraries.
+* Using `anyhow` and `thiserror` for error handling as opposed to `Box<dyn Error>`.  I like this and begin to understand the use case for 2 separate libraries.
 * Traits having dynamic dispatch and async functions.  `handlers::RequestHandler` is similar to `http.Handler` in go.
 * Generic lifetime parameters in structs to avoid data copies.  See `request::FastCGIRequest` and `handlers::request_info::RequestInfoResponse` for examples.
 * Use of generics in server code to allow common connection and request processing code while supporting both tcp and unix server socket types.
