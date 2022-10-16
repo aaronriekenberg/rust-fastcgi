@@ -10,6 +10,7 @@ use crate::{
     connection::FastCGIConnectionID, handlers::RequestHandler, request::FastCGIRequest,
     response::Responder,
 };
+
 pub struct ConnectionProcessor {
     handlers: Arc<dyn RequestHandler>,
     fastcgi_connection_configuration: crate::config::FastCGIConnectionConfiguration,
