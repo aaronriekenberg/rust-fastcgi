@@ -22,30 +22,22 @@ impl<'a> FastCGIRequest<'a> {
         connection_id: FastCGIConnectionID,
         request: &'a tokio_fastcgi::Request<impl GenericAsyncWriter>,
     ) -> FastCGIRequest<'a> {
-        let request_id = FastCGIRequestID(request.get_request_id());
-
-        let role = match request.role {
-            tokio_fastcgi::Role::Authorizer => "Authorizer",
-            tokio_fastcgi::Role::Filter => "Filter",
-            tokio_fastcgi::Role::Responder => "Responder",
-        };
-
-        let request_uri = request.get_str_param("request_uri");
-
-        let params: Vec<ParamKeyValue<'a>> = match request.str_params_iter() {
-            Some(iter) => iter
-                .filter(|v| v.0 != "request_uri")
-                .map(|v| (v.0, v.1.unwrap_or("[Invalid UTF8]")))
-                .collect(),
-            None => Vec::new(),
-        };
-
-        FastCGIRequest {
-            role,
+        Self {
+            role: match request.role {
+                tokio_fastcgi::Role::Authorizer => "Authorizer",
+                tokio_fastcgi::Role::Filter => "Filter",
+                tokio_fastcgi::Role::Responder => "Responder",
+            },
             connection_id,
-            request_id,
-            request_uri,
-            params,
+            request_id: FastCGIRequestID(request.get_request_id()),
+            request_uri: request.get_str_param("request_uri"),
+            params: match request.str_params_iter() {
+                Some(iter) => iter
+                    .filter(|v| v.0 != "request_uri")
+                    .map(|v| (v.0, v.1.unwrap_or("[Invalid UTF8]")))
+                    .collect(),
+                None => Vec::new(),
+            },
         }
     }
 }
