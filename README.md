@@ -18,7 +18,7 @@ This app provides a small REST style api with these JSON endpoints:
 
 * Install Rust (https://www.rust-lang.org/)
 * Clone this git repo
-* `cargo build -v`
+* `cargo build -v` build in debug mode (fast build, not optimized)
 * Run the app setting logging level to debug and using configuration file `./config/unix.json`:
 
 ```
