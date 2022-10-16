@@ -6,7 +6,7 @@ A port of a go FastCGI app (https://github.com/aaronriekenberg/go-fastcgi) into 
 
 Mostly this an exercise to learn more Rust.
 
-Currently this is the backend for https://aaronr.digital.
+Currently this is the backend for https://aaronr.digital on a Raspberry Pi.
 
 This app provides a small REST style api with these JSON endpoints:
 
