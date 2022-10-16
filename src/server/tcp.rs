@@ -48,7 +48,7 @@ impl TcpServer {
 
         debug!("connection_id {:?} from {:?}", connection_id, address);
 
-       Arc::clone(& self.connection_processor)
+        Arc::clone(&self.connection_processor)
             .handle_connection(connection_id, stream.into_split());
     }
 }
