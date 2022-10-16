@@ -11,28 +11,29 @@ use crate::{
     response::Responder,
 };
 pub struct ConnectionProcessor {
-    connection_id: FastCGIConnectionID,
     handlers: Arc<dyn RequestHandler>,
     fastcgi_connection_configuration: crate::config::FastCGIConnectionConfiguration,
 }
 
 impl ConnectionProcessor {
     pub fn new(
-        connection_id: FastCGIConnectionID,
         handlers: Arc<dyn RequestHandler>,
         fastcgi_connection_configuration: &crate::config::FastCGIConnectionConfiguration,
     ) -> Arc<Self> {
         Arc::new(Self {
-            connection_id,
             handlers,
             fastcgi_connection_configuration: fastcgi_connection_configuration.clone(),
         })
     }
 
-    async fn process_one_request(self: Arc<Self>, request: Request<impl GenericAsyncWriter>) {
+    async fn process_one_request(
+        self: Arc<Self>,
+        connection_id: FastCGIConnectionID,
+        request: Request<impl GenericAsyncWriter>,
+    ) {
         if let Err(err) = request
             .process(|request| async move {
-                let fastcgi_request = FastCGIRequest::new(self.connection_id, request.as_ref());
+                let fastcgi_request = FastCGIRequest::new(connection_id, request.as_ref());
 
                 let http_response = self.handlers.handle(fastcgi_request).await;
 
@@ -45,8 +46,11 @@ impl ConnectionProcessor {
         }
     }
 
-    pub fn start<R, W>(self: Arc<Self>, split_socket: (R, W))
-    where
+    pub fn handle_connection<R, W>(
+        self: Arc<Self>,
+        connection_id: FastCGIConnectionID,
+        split_socket: (R, W),
+    ) where
         R: GenericAsyncReader + Send + Sync + 'static,
         W: GenericAsyncWriter + Send + Sync + 'static,
     {
@@ -68,7 +72,7 @@ impl ConnectionProcessor {
             // Loop over the requests via the next method and process them.
             // Spawn a new task to process each request.
             while let Ok(Some(request)) = requests.next().await {
-                tokio::spawn(Arc::clone(&self).process_one_request(request));
+                tokio::spawn(Arc::clone(&self).process_one_request(connection_id,request));
             }
         });
     }

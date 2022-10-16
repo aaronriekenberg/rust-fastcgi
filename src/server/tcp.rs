@@ -9,25 +9,22 @@ use log::{debug, info};
 
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::{
-    connection::FastCGIConnectionIDFactory, handlers::RequestHandler,
-    server::processor::ConnectionProcessor,
-};
+use crate::{connection::FastCGIConnectionIDFactory, server::processor::ConnectionProcessor};
 
 pub struct TcpServer {
     server_configuration: crate::config::ServerConfiguration,
-    handlers: Arc<dyn RequestHandler>,
+    connection_processor: Arc<ConnectionProcessor>,
     connection_id_factory: FastCGIConnectionIDFactory,
 }
 
 impl TcpServer {
     pub fn new(
         server_configuration: &crate::config::ServerConfiguration,
-        handlers: Arc<dyn RequestHandler>,
+        connection_processor: Arc<ConnectionProcessor>,
     ) -> Self {
         Self {
             server_configuration: server_configuration.clone(),
-            handlers,
+            connection_processor,
             connection_id_factory: FastCGIConnectionIDFactory::new(),
         }
     }
@@ -51,12 +48,8 @@ impl TcpServer {
 
         debug!("connection_id {:?} from {:?}", connection_id, address);
 
-        ConnectionProcessor::new(
-            connection_id,
-            Arc::clone(&self.handlers),
-            self.server_configuration.fastcgi_connection_configuration(),
-        )
-        .start(stream.into_split());
+       Arc::clone(& self.connection_processor)
+            .handle_connection(connection_id, stream.into_split());
     }
 }
 
