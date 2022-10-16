@@ -73,7 +73,7 @@ impl ConnectionProcessor {
             // Loop over the requests via the next method and process them.
             // Spawn a new task to process each request.
             while let Ok(Some(request)) = requests.next().await {
-                tokio::spawn(Arc::clone(&self).process_one_request(connection_id,request));
+                tokio::spawn(Arc::clone(&self).process_one_request(connection_id, request));
             }
         });
     }
