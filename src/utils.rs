@@ -1,4 +1,4 @@
-use tokio::io::{AsyncRead,AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 // idea from https://github.com/rust-lang/rust/issues/41517#issuecomment-1140505957
 pub trait GenericAsyncWriter: AsyncWrite + Unpin {}
