@@ -32,7 +32,7 @@ RUST_LOG=debug ./target/debug/rust-fastcgi ./config/unix.json
   * TCP and UNIX server sockets
   * Timeouts
   * Semaphores
-* [tokio-fastcgi](https://github.com/FlashSystems/tokio-fastcgi) library depending on tokio that implements the fastcgi protocol. 
+* [tokio-fastcgi](https://github.com/FlashSystems/tokio-fastcgi) excellent library depending on tokio that implements the fastcgi protocol. 
   * This app implements a FastCGI "Responder" (aka server)
 * [async-trait](https://github.com/dtolnay/async-trait) allows rust traits to contain `async` functions
 * [env_logger](https://github.com/env-logger-rs/env_logger) logger configurable via environment variables
