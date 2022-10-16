@@ -12,14 +12,11 @@
         "semaphore_acquire_timeout_millis": 200,
         "commands": [
             {
-                "id": "chronyc_sources",
-                "description": "chronyc sources",
-                "command": "/usr/bin/chronyc",
+                "id": "timedatectl_timesync_status",
+                "description": "timedatectl timesync status",
+                "command": "/usr/bin/timedatectl",
                 "args": [
-                    "-n",
-                    "sources",
-                    "-a",
-                    "-v"
+                    "timesync-status"
                 ]
             },
             {
