@@ -2,11 +2,13 @@
 
 ## What is this?
 
-A port of a go FastCGI app (https://github.com/aaronriekenberg/go-fastcgi) into Rust.
+A port of a go fastcgi app (https://github.com/aaronriekenberg/go-fastcgi) into rust.
 
-Mostly this an exercise to learn more Rust.
+Mostly this an exercise to learn more rust.
 
-Currently this is the backend for https://aaronr.digital on a Raspberry Pi.
+Currently this is the backend for https://aaronr.digital on a Raspberry Pi.  
+* I use this behind [Caddy](https://github.com/caddyserver/caddy) using fastcgi reverse proxy over a unix socket.  
+* Should work with any fastcgi reverse proxy using tcp or unix sockets.
 
 This app provides a small REST style api with these JSON endpoints:
 
