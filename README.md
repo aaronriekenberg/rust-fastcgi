@@ -40,3 +40,12 @@ RUST_LOG=debug ./target/debug/rust-fastcgi ./config/unix.json
   * [anyhow](https://github.com/dtolnay/anyhow) used for application error handling to propogate and format fatal errors.
   * [thiserror](https://github.com/dtolnay/thiserror) used for defining custom error types.  Used for internal APIs that need precise error handling.
 * [serde](https://serde.rs/) used for marshalling and unmarshalling JSON.
+
+
+## Some learnings:
+
+* Traits having dynamic dispatch and async functions.  `handlers::RequestHandler` is similar to `http.Handler` in go.
+* Generic lifetime parameters in structs to avoid data copies.  See `request::FastCGIRequest` and `handlers::request_info::RequestInfoResponse` for examples.
+* Use of generics in server code to allow common connection and request processing code while supporting both tcp and unix server socket types.
+* Use of `'static` lifetime in `server::ConnectionProcessor::handle_connection` to allow for owned but non-global types.  [This reference](https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md#2-if-t-static-then-t-must-be-valid-for-the-entire-program) was very enlightning.
+* `handlers::command::RunCommandResponse` contains perhaps the first 128-bit variable I have ever used :)
