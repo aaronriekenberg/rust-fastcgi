@@ -12,14 +12,6 @@
         "semaphore_acquire_timeout_millis": 200,
         "commands": [
             {
-                "id": "timedatectl_timesync_status",
-                "description": "timedatectl timesync status",
-                "command": "/usr/bin/timedatectl",
-                "args": [
-                    "timesync-status"
-                ]
-            },
-            {
                 "id": "df",
                 "description": "df",
                 "command": "/usr/bin/df",
@@ -53,6 +45,14 @@
                 "id": "pitemp",
                 "description": "pitemp",
                 "command": "/home/aaron/repo/raspberrypi/pitemp.sh"
+            },
+            {
+                "id": "timedatectl_timesync_status",
+                "description": "timedatectl timesync status",
+                "command": "/usr/bin/timedatectl",
+                "args": [
+                    "timesync-status"
+                ]
             },
             {
                 "id": "top",
