@@ -3,8 +3,6 @@ mod request_info;
 mod route;
 mod utils;
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 
 use crate::{request::FastCGIRequest, response::HttpResponse};
@@ -16,7 +14,7 @@ pub trait RequestHandler: Send + Sync {
 
 pub fn create_handlers(
     configuration: &crate::config::Configuration,
-) -> anyhow::Result<Arc<dyn RequestHandler>> {
+) -> anyhow::Result<Box<dyn RequestHandler>> {
     let mut routes = Vec::new();
 
     routes.append(&mut commands::create_routes(
@@ -25,5 +23,5 @@ pub fn create_handlers(
 
     routes.append(&mut request_info::create_routes());
 
-    Ok(Arc::new(route::Router::new(routes)?))
+    Ok(Box::new(route::Router::new(routes)?))
 }

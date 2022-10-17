@@ -4,8 +4,6 @@ mod unix;
 
 use async_trait::async_trait;
 
-use std::sync::Arc;
-
 use crate::{
     config::ServerType,
     handlers::RequestHandler,
@@ -23,7 +21,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(
-        handlers: Arc<dyn RequestHandler>,
+        handlers: Box<dyn RequestHandler>,
         server_configuration: &crate::config::ServerConfiguration,
     ) -> Self {
         let connection_processor = ConnectionProcessor::new(

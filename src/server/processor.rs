@@ -12,13 +12,13 @@ use crate::{
 };
 
 pub struct ConnectionProcessor {
-    handlers: Arc<dyn RequestHandler>,
+    handlers: Box<dyn RequestHandler>,
     fastcgi_connection_configuration: crate::config::FastCGIConnectionConfiguration,
 }
 
 impl ConnectionProcessor {
     pub fn new(
-        handlers: Arc<dyn RequestHandler>,
+        handlers: Box<dyn RequestHandler>,
         fastcgi_connection_configuration: &crate::config::FastCGIConnectionConfiguration,
     ) -> Arc<Self> {
         Arc::new(Self {
