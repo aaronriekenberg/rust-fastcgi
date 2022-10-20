@@ -4,7 +4,7 @@ use anyhow::Context;
 
 use async_trait::async_trait;
 
-use chrono::prelude::Local;
+use chrono::prelude::{Local, SecondsFormat};
 
 use log::warn;
 
@@ -23,7 +23,7 @@ use crate::handlers::{
 };
 
 fn current_time_string() -> String {
-    Local::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+    Local::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
 }
 
 struct AllCommandsHandler {
