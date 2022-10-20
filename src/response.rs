@@ -1,4 +1,4 @@
-use std::{fmt::Write, sync::Arc};
+use std::{borrow::Cow, fmt::Write, sync::Arc};
 
 use log::{debug, warn};
 
@@ -6,7 +6,7 @@ use tokio_fastcgi::{Request, RequestResult};
 
 use crate::utils::GenericAsyncWriter;
 
-pub type HttpResponse = http::Response<Option<String>>;
+pub type HttpResponse = http::Response<Option<Cow<'static, str>>>;
 
 #[derive(thiserror::Error, Debug)]
 enum SendResponseError {
@@ -59,8 +59,11 @@ impl<W: GenericAsyncWriter> Responder<W> {
 
         let mut write_buffer = header_string.into_bytes();
 
-        if let Some(body_string) = self.response.into_body() {
-            write_buffer.append(&mut body_string.into_bytes());
+        if let Some(body_cow) = self.response.into_body() {
+            match body_cow {
+                Cow::Borrowed(body) => write_buffer.extend_from_slice(body.as_bytes()),
+                Cow::Owned(body) => write_buffer.append(&mut body.into_bytes()),
+            }
         }
 
         self.request.get_stdout().write(&write_buffer).await?;
