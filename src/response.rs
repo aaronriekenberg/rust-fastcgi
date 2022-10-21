@@ -23,14 +23,14 @@ impl HttpResponseBody {
 }
 
 impl From<Arc<String>> for HttpResponseBody {
-    fn from(s: Arc<String>) -> HttpResponseBody {
-        HttpResponseBody::ArcString(s)
+    fn from(a: Arc<String>) -> Self {
+        Self::ArcString(a)
     }
 }
 
 impl From<String> for HttpResponseBody {
-    fn from(s: String) -> HttpResponseBody {
-        HttpResponseBody::String(s)
+    fn from(s: String) -> Self {
+        Self::String(s)
     }
 }
 
@@ -83,9 +83,9 @@ impl<W: GenericAsyncWriter> Responder<W> {
     }
 
     async fn send_response(self) -> Result<(), SendResponseError> {
-        let mut stdout = self.request.get_stdout();
-
         let header_string = self.build_header_string()?;
+
+        let mut stdout = self.request.get_stdout();
 
         stdout.write(&header_string.into_bytes()).await?;
 
