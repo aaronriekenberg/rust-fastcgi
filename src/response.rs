@@ -13,6 +13,15 @@ pub enum HttpResponseBody {
     String(String),
 }
 
+impl HttpResponseBody {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::ArcString(a) => a.as_bytes(),
+            Self::String(s) => s.as_bytes(),
+        }
+    }
+}
+
 impl From<Arc<String>> for HttpResponseBody {
     fn from(s: Arc<String>) -> HttpResponseBody {
         HttpResponseBody::ArcString(s)
@@ -81,10 +90,7 @@ impl<W: GenericAsyncWriter> Responder<W> {
         stdout.write(&header_string.into_bytes()).await?;
 
         if let Some(http_response_body) = self.response.into_body() {
-            match http_response_body {
-                HttpResponseBody::ArcString(s) => stdout.write(s.as_bytes()).await?,
-                HttpResponseBody::String(s) => stdout.write(s.as_bytes()).await?,
-            };
+            stdout.write(http_response_body.as_bytes()).await?;
         }
 
         Ok(())
