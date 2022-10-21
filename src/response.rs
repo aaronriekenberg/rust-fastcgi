@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Write, sync::Arc};
+use std::{fmt::Write, sync::Arc};
 
 use log::{debug, warn};
 
@@ -6,7 +6,26 @@ use tokio_fastcgi::{Request, RequestResult};
 
 use crate::utils::GenericAsyncWriter;
 
-pub type HttpResponse = http::Response<Option<Cow<'static, str>>>;
+#[derive(Debug)]
+pub enum HttpResponseBody {
+    ArcString(Arc<String>),
+
+    String(String),
+}
+
+impl From<Arc<String>> for HttpResponseBody {
+    fn from(s: Arc<String>) -> HttpResponseBody {
+        HttpResponseBody::ArcString(s)
+    }
+}
+
+impl From<String> for HttpResponseBody {
+    fn from(s: String) -> HttpResponseBody {
+        HttpResponseBody::String(s)
+    }
+}
+
+pub type HttpResponse = http::Response<Option<HttpResponseBody>>;
 
 #[derive(thiserror::Error, Debug)]
 enum SendResponseError {
@@ -59,10 +78,10 @@ impl<W: GenericAsyncWriter> Responder<W> {
 
         let mut write_buffer = header_string.into_bytes();
 
-        if let Some(body_cow) = self.response.into_body() {
-            match body_cow {
-                Cow::Borrowed(body) => write_buffer.extend_from_slice(body.as_bytes()),
-                Cow::Owned(body) => write_buffer.append(&mut body.into_bytes()),
+        if let Some(http_response_body) = self.response.into_body() {
+            match http_response_body {
+                HttpResponseBody::ArcString(s) => write_buffer.extend_from_slice(s.as_bytes()),
+                HttpResponseBody::String(s) => write_buffer.append(&mut s.into_bytes()),
             }
         }
 

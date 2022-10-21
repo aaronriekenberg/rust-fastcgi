@@ -1,21 +1,15 @@
-use std::borrow::Cow;
-
 use log::warn;
 
 use serde::Serialize;
 
-use crate::response::HttpResponse;
+use crate::response::{HttpResponse, HttpResponseBody};
 
-pub fn build_json_cow_response(json_cow: Cow<'static, str>) -> HttpResponse {
+pub fn build_json_body_response(http_response_body: HttpResponseBody) -> HttpResponse {
     http::Response::builder()
         .status(http::StatusCode::OK)
         .header(http::header::CONTENT_TYPE, "application/json")
-        .body(Some(json_cow))
+        .body(Some(http_response_body))
         .unwrap()
-}
-
-pub fn build_json_string_response(json_string: String) -> HttpResponse {
-    build_json_cow_response(Cow::from(json_string))
 }
 
 pub fn build_json_response(response_dto: impl Serialize) -> HttpResponse {
@@ -30,7 +24,7 @@ pub fn build_json_response(response_dto: impl Serialize) -> HttpResponse {
                 .body(None)
                 .unwrap()
         }
-        Ok(json_string) => build_json_string_response(json_string),
+        Ok(json_string) => build_json_body_response(HttpResponseBody::from(json_string)),
     }
 }
 

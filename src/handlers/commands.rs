@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Context;
 
@@ -18,8 +18,8 @@ use serde::Serialize;
 
 use crate::handlers::{
     route::URIAndHandler,
-    utils::{build_json_response, build_json_cow_response, build_status_code_response},
-    {FastCGIRequest, HttpResponse, RequestHandler},
+    utils::{build_json_body_response, build_json_response, build_status_code_response},
+    {FastCGIRequest, HttpResponse, HttpResponseBody, RequestHandler},
 };
 
 fn current_time_string() -> String {
@@ -27,7 +27,7 @@ fn current_time_string() -> String {
 }
 
 struct AllCommandsHandler {
-    json_str: &'static str,
+    json_string: Arc<String>,
 }
 
 impl AllCommandsHandler {
@@ -36,7 +36,7 @@ impl AllCommandsHandler {
             .context("AllCommandsHandler::new: json marshal error")?;
 
         Ok(Self {
-            json_str: Box::leak(json_string.into_boxed_str()),
+            json_string: Arc::new(json_string),
         })
     }
 }
@@ -44,7 +44,7 @@ impl AllCommandsHandler {
 #[async_trait]
 impl RequestHandler for AllCommandsHandler {
     async fn handle(&self, _request: FastCGIRequest<'_>) -> HttpResponse {
-        build_json_cow_response(Cow::from(self.json_str))
+        build_json_body_response(HttpResponseBody::from(Arc::clone(&self.json_string)))
     }
 }
 

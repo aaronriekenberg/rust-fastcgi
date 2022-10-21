@@ -5,7 +5,7 @@ mod utils;
 
 use async_trait::async_trait;
 
-use crate::{request::FastCGIRequest, response::HttpResponse};
+use crate::{request::FastCGIRequest, response::HttpResponse, response::HttpResponseBody};
 
 #[async_trait]
 pub trait RequestHandler: Send + Sync {
