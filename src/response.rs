@@ -74,18 +74,18 @@ impl<W: GenericAsyncWriter> Responder<W> {
     }
 
     async fn send_response(self) -> Result<(), SendResponseError> {
+        let mut stdout = self.request.get_stdout();
+
         let header_string = self.build_header_string()?;
 
-        let mut write_buffer = header_string.into_bytes();
+        stdout.write(&header_string.into_bytes()).await?;
 
         if let Some(http_response_body) = self.response.into_body() {
             match http_response_body {
-                HttpResponseBody::ArcString(s) => write_buffer.extend_from_slice(s.as_bytes()),
-                HttpResponseBody::String(s) => write_buffer.append(&mut s.into_bytes()),
-            }
+                HttpResponseBody::ArcString(s) => stdout.write(s.as_bytes()).await?,
+                HttpResponseBody::String(s) => stdout.write(s.as_bytes()).await?,
+            };
         }
-
-        self.request.get_stdout().write(&write_buffer).await?;
 
         Ok(())
     }
