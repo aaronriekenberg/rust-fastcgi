@@ -6,20 +6,20 @@ use crate::config::ServerType;
 
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct FastCGIConnectionID {
-    server_type: ServerType,
     id: u64,
+    server_type: ServerType,
 }
 
 pub struct FastCGIConnectionIDFactory {
-    server_type: ServerType,
     next_connection_id: AtomicU64,
+    server_type: ServerType,
 }
 
 impl FastCGIConnectionIDFactory {
     pub fn new(server_type: ServerType) -> Self {
         Self {
-            server_type,
             next_connection_id: AtomicU64::new(1),
+            server_type,
         }
     }
 
@@ -27,8 +27,8 @@ impl FastCGIConnectionIDFactory {
         let id = self.next_connection_id.fetch_add(1, Ordering::Relaxed);
 
         FastCGIConnectionID {
-            server_type: self.server_type,
             id,
+            server_type: self.server_type,
         }
     }
 }
