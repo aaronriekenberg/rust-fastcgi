@@ -9,7 +9,10 @@ use log::{debug, info};
 
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::{connection::FastCGIConnectionIDFactory, server::processor::ConnectionProcessor};
+use crate::{
+    config::ServerType, connection::FastCGIConnectionIDFactory,
+    server::processor::ConnectionProcessor,
+};
 
 pub struct TcpServer {
     server_configuration: crate::config::ServerConfiguration,
@@ -25,7 +28,7 @@ impl TcpServer {
         Self {
             server_configuration: server_configuration.clone(),
             connection_processor,
-            connection_id_factory: FastCGIConnectionIDFactory::new(),
+            connection_id_factory: FastCGIConnectionIDFactory::new(ServerType::TCP),
         }
     }
 

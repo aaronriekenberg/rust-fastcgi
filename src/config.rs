@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use tokio::{fs::File, io::AsyncReadExt};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum ServerType {
     TCP,
     UNIX,

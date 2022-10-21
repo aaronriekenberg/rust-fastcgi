@@ -11,7 +11,10 @@ use tokio::net::{
     {UnixListener, UnixStream},
 };
 
-use crate::{connection::FastCGIConnectionIDFactory, server::processor::ConnectionProcessor};
+use crate::{
+    config::ServerType, connection::FastCGIConnectionIDFactory,
+    server::processor::ConnectionProcessor,
+};
 
 pub struct UnixServer {
     server_configuration: crate::config::ServerConfiguration,
@@ -27,7 +30,7 @@ impl UnixServer {
         Self {
             server_configuration: server_configuration.clone(),
             connection_processor,
-            connection_id_factory: FastCGIConnectionIDFactory::new(),
+            connection_id_factory: FastCGIConnectionIDFactory::new(ServerType::UNIX),
         }
     }
 

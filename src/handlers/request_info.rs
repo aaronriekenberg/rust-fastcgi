@@ -4,16 +4,19 @@ use async_trait::async_trait;
 
 use serde::Serialize;
 
-use crate::handlers::{
-    route::URIAndHandler,
-    utils::build_json_response,
-    {FastCGIRequest, HttpResponse, RequestHandler},
+use crate::{
+    connection::FastCGIConnectionID,
+    handlers::{
+        route::URIAndHandler,
+        utils::build_json_response,
+        {FastCGIRequest, HttpResponse, RequestHandler},
+    },
 };
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Serialize)]
 struct RequestInfoResponse<'a> {
     fastcgi_role: &'a str,
-    fastcgi_connection_id: u64,
+    fastcgi_connection_id: FastCGIConnectionID,
     fastcgi_request_id: u16,
     request_uri: &'a str,
     http_headers: BTreeMap<&'a str, &'a str>,
@@ -33,10 +36,11 @@ impl RequestHandler for RequestInfoHandler {
     async fn handle(&self, request: FastCGIRequest<'_>) -> HttpResponse {
         let mut response = RequestInfoResponse {
             fastcgi_role: request.role(),
-            fastcgi_connection_id: request.connection_id().0,
+            fastcgi_connection_id: *request.connection_id(),
             fastcgi_request_id: request.request_id().0,
             request_uri: request.request_uri().unwrap_or("[Unknown URI]"),
-            ..Default::default()
+            http_headers: BTreeMap::new(),
+            other_params: BTreeMap::new(),
         };
 
         for (key, value) in request.params().iter() {
