@@ -2,7 +2,7 @@ use log::warn;
 
 use serde::Serialize;
 
-use crate::response::{HttpResponse, HttpResponseBody};
+use crate::response::{body::HttpResponseBody, HttpResponse};
 
 pub fn build_json_body_response(http_response_body: HttpResponseBody) -> HttpResponse {
     http::Response::builder()

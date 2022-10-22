@@ -8,7 +8,7 @@ use crate::utils::{GenericAsyncReader, GenericAsyncWriter};
 
 use crate::{
     connection::FastCGIConnectionID, handlers::RequestHandler, request::FastCGIRequest,
-    response::Responder,
+    response::responder::Responder,
 };
 
 pub struct ConnectionProcessor {
