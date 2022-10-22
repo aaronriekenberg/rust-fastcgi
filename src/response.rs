@@ -1,4 +1,4 @@
 pub mod body;
-pub mod responder;
+pub mod writer;
 
 pub type HttpResponse = http::Response<Option<body::HttpResponseBody>>;

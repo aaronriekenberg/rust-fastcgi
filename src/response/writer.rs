@@ -15,12 +15,12 @@ enum SendResponseError {
     TokioFastCGIWriteError(#[from] tokio_fastcgi::Error),
 }
 
-pub struct Responder<W: GenericAsyncWriter> {
+pub struct ResponseWriter<W: GenericAsyncWriter> {
     request: Arc<Request<W>>,
     response: HttpResponse,
 }
 
-impl<W: GenericAsyncWriter> Responder<W> {
+impl<W: GenericAsyncWriter> ResponseWriter<W> {
     pub fn new(request: Arc<Request<W>>, response: HttpResponse) -> Self {
         Self { request, response }
     }

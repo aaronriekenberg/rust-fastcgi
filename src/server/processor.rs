@@ -8,7 +8,7 @@ use crate::utils::{GenericAsyncReader, GenericAsyncWriter};
 
 use crate::{
     connection::FastCGIConnectionID, handlers::RequestHandler, request::FastCGIRequest,
-    response::responder::Responder,
+    response::writer::ResponseWriter,
 };
 
 pub struct ConnectionProcessor {
@@ -38,7 +38,7 @@ impl ConnectionProcessor {
 
                 let http_response = self.handlers.handle(fastcgi_request).await;
 
-                Responder::new(request, http_response).respond().await
+                ResponseWriter::new(request, http_response).respond().await
             })
             .await
         {
