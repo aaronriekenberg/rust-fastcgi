@@ -17,7 +17,7 @@ use tokio::{
 use serde::Serialize;
 
 use crate::handlers::{
-    route::URIAndHandler,
+    route::PathSuffixAndHandler,
     utils::{build_json_body_response, build_json_response, build_status_code_response},
     {FastCGIRequest, HttpResponse, HttpResponseBody, RequestHandler},
 };
@@ -165,31 +165,23 @@ impl RequestHandler for RunCommandHandler {
 }
 
 pub fn create_routes(
-    context_configuration: &crate::config::ContextConfiguration,
     command_configuration: &crate::config::CommandConfiguration,
-) -> anyhow::Result<Vec<URIAndHandler>> {
-    let mut routes: Vec<URIAndHandler> =
+) -> anyhow::Result<Vec<PathSuffixAndHandler>> {
+    let mut routes: Vec<PathSuffixAndHandler> =
         Vec::with_capacity(1 + command_configuration.commands().len());
 
     routes.push((
-        Path::new(context_configuration.context())
-            .join("commands")
-            .to_string_lossy()
-            .into_owned(),
+        Path::new("commands").to_owned(),
         Box::new(AllCommandsHandler::new(command_configuration.commands())?),
     ));
 
     let run_command_semaphore = RunCommandSemapore::new(command_configuration);
 
     for command_info in command_configuration.commands() {
-        let expected_uri = Path::new(context_configuration.context())
-            .join("commands")
-            .join(command_info.id())
-            .to_string_lossy()
-            .into_owned();
+        let path_suffix = Path::new("commands").join(command_info.id()).to_owned();
 
         routes.push((
-            expected_uri,
+            path_suffix,
             Box::new(RunCommandHandler::new(
                 Arc::clone(&run_command_semaphore),
                 command_info.clone(),

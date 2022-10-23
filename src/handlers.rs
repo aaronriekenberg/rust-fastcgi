@@ -18,13 +18,13 @@ pub fn create_handlers(
     let mut routes = Vec::new();
 
     routes.append(&mut commands::create_routes(
-        configuration.context_configuration(),
         configuration.command_configuration(),
     )?);
 
-    routes.append(&mut request_info::create_routes(
-        configuration.context_configuration(),
-    ));
+    routes.append(&mut request_info::create_routes());
 
-    Ok(Box::new(route::Router::new(routes)?))
+    Ok(Box::new(route::Router::new(
+        configuration.context_configuration(),
+        routes,
+    )?))
 }

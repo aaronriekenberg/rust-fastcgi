@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::{
     connection::FastCGIConnectionID,
     handlers::{
-        route::URIAndHandler,
+        route::PathSuffixAndHandler,
         utils::build_json_response,
         {FastCGIRequest, HttpResponse, RequestHandler},
     },
@@ -56,14 +56,9 @@ impl RequestHandler for RequestInfoHandler {
     }
 }
 
-pub fn create_routes(
-    context_configuration: &crate::config::ContextConfiguration,
-) -> Vec<URIAndHandler> {
+pub fn create_routes() -> Vec<PathSuffixAndHandler> {
     vec![(
-        Path::new(context_configuration.context())
-            .join("request_info")
-            .to_string_lossy()
-            .into_owned(),
+        Path::new("request_info").to_owned(),
         Box::new(RequestInfoHandler::new()),
     )]
 }

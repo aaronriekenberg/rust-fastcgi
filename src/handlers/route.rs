@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path, path::PathBuf};
 
 use async_trait::async_trait;
 
@@ -7,18 +7,27 @@ use crate::handlers::{
     {FastCGIRequest, HttpResponse, RequestHandler},
 };
 
-pub type URIAndHandler = (String, Box<dyn RequestHandler>);
+pub type PathSuffixAndHandler = (PathBuf, Box<dyn RequestHandler>);
 
 pub struct Router {
     uri_to_request_handler: HashMap<String, Box<dyn RequestHandler>>,
 }
 
 impl Router {
-    pub fn new(routes: Vec<URIAndHandler>) -> anyhow::Result<Self> {
+    pub fn new(
+        context_configuration: &crate::config::ContextConfiguration,
+        routes: Vec<PathSuffixAndHandler>,
+    ) -> anyhow::Result<Self> {
         let mut router = Self {
             uri_to_request_handler: HashMap::with_capacity(routes.len()),
         };
-        for (ref uri, handler) in routes {
+
+        for (path_suffix, handler) in routes {
+            let uri = Path::new(context_configuration.context())
+                .join(path_suffix)
+                .to_string_lossy()
+                .into_owned();
+
             if router
                 .uri_to_request_handler
                 .insert(uri.clone(), handler)
