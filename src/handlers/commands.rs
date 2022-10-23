@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Context;
 
@@ -171,14 +171,14 @@ pub fn create_routes(
         Vec::with_capacity(1 + command_configuration.commands().len());
 
     routes.push((
-        Path::new("commands").to_owned(),
+        PathBuf::from("commands"),
         Box::new(AllCommandsHandler::new(command_configuration.commands())?),
     ));
 
     let run_command_semaphore = RunCommandSemapore::new(command_configuration);
 
     for command_info in command_configuration.commands() {
-        let path_suffix = Path::new("commands").join(command_info.id()).to_owned();
+        let path_suffix = PathBuf::from("commands").join(command_info.id());
 
         routes.push((
             path_suffix,

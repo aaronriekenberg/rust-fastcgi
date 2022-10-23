@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use async_trait::async_trait;
 
@@ -58,7 +58,7 @@ impl RequestHandler for RequestInfoHandler {
 
 pub fn create_routes() -> Vec<PathSuffixAndHandler> {
     vec![(
-        Path::new("request_info").to_owned(),
+        PathBuf::from("request_info"),
         Box::new(RequestInfoHandler::new()),
     )]
 }
