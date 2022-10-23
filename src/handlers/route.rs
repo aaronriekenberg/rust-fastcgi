@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::Path, path::PathBuf};
 
+use anyhow::Context;
 use async_trait::async_trait;
 
 use crate::handlers::{
@@ -22,11 +23,17 @@ impl Router {
             uri_to_request_handler: HashMap::with_capacity(routes.len()),
         };
 
-        for (path_suffix, handler) in routes {
+        for (ref path_suffix, handler) in routes {
             let uri = Path::new(context_configuration.context())
                 .join(path_suffix)
-                .to_string_lossy()
-                .into_owned();
+                .to_str()
+                .with_context(|| {
+                    format!(
+                        "route path contains invalid UTF-8 path_suffix = '{:?}'",
+                        path_suffix
+                    )
+                })?
+                .to_owned();
 
             if router
                 .uri_to_request_handler
