@@ -1,4 +1,7 @@
 {
+    "context_configuration": {
+        "context": "/cgi-bin"
+    },
     "server_configuration": {
         "server_type": "TCP",
         "bind_address": "127.0.0.1:10082",

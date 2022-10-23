@@ -8,6 +8,12 @@ use serde::{Deserialize, Serialize};
 
 use tokio::{fs::File, io::AsyncReadExt};
 
+#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[getset(get = "pub")]
+pub struct ContextConfiguration {
+    context: String,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum ServerType {
     TCP,
@@ -50,6 +56,7 @@ pub struct CommandConfiguration {
 #[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct Configuration {
+    context_configuration: ContextConfiguration,
     server_configuration: ServerConfiguration,
     command_configuration: CommandConfiguration,
 }

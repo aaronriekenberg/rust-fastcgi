@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use anyhow::Context;
 
@@ -165,20 +165,28 @@ impl RequestHandler for RunCommandHandler {
 }
 
 pub fn create_routes(
+    context_configuration: &crate::config::ContextConfiguration,
     command_configuration: &crate::config::CommandConfiguration,
 ) -> anyhow::Result<Vec<URIAndHandler>> {
     let mut routes: Vec<URIAndHandler> =
         Vec::with_capacity(1 + command_configuration.commands().len());
 
     routes.push((
-        "/cgi-bin/commands".to_string(),
+        Path::new(context_configuration.context())
+            .join("commands")
+            .to_string_lossy()
+            .into_owned(),
         Box::new(AllCommandsHandler::new(command_configuration.commands())?),
     ));
 
     let run_command_semaphore = RunCommandSemapore::new(command_configuration);
 
     for command_info in command_configuration.commands() {
-        let expected_uri = format!("/cgi-bin/commands/{}", command_info.id());
+        let expected_uri = Path::new(context_configuration.context())
+            .join("commands")
+            .join(command_info.id())
+            .to_string_lossy()
+            .into_owned();
 
         routes.push((
             expected_uri,

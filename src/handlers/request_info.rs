@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
 use async_trait::async_trait;
 
@@ -56,9 +56,14 @@ impl RequestHandler for RequestInfoHandler {
     }
 }
 
-pub fn create_routes() -> Vec<URIAndHandler> {
+pub fn create_routes(
+    context_configuration: &crate::config::ContextConfiguration,
+) -> Vec<URIAndHandler> {
     vec![(
-        "/cgi-bin/request_info".to_string(),
+        Path::new(context_configuration.context())
+            .join("request_info")
+            .to_string_lossy()
+            .into_owned(),
         Box::new(RequestInfoHandler::new()),
     )]
 }

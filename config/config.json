@@ -1,4 +1,7 @@
 {
+    "context_configuration": {
+        "context": "/cgi-bin"
+    },
     "server_configuration": {
         "server_type": "UNIX",
         "bind_address": "/var/www/run/go-fastcgi/socket",
