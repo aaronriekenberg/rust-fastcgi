@@ -51,7 +51,7 @@ impl ConnectionProcessor {
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
         tokio::spawn(async move {
-            let fastcgi_connection_configuration = crate::config::get_configuration()
+            let fastcgi_connection_configuration = crate::config::instance()
                 .server_configuration()
                 .fastcgi_connection_configuration();
 

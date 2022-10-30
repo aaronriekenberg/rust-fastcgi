@@ -20,7 +20,7 @@ impl Router {
             uri_to_request_handler: HashMap::with_capacity(routes.len()),
         };
 
-        let context_configuration = crate::config::get_configuration().context_configuration();
+        let context_configuration = crate::config::instance().context_configuration();
 
         for (path_suffix, handler) in routes {
             let uri_pathbuf = PathBuf::from(context_configuration.context()).join(path_suffix);

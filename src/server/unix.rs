@@ -30,7 +30,7 @@ impl UnixServer {
     }
 
     async fn create_listener(&self) -> anyhow::Result<UnixListener> {
-        let server_configuration = crate::config::get_configuration().server_configuration();
+        let server_configuration = crate::config::instance().server_configuration();
         let bind_address = server_configuration.bind_address();
 
         // do not fail on remove error, the path may not exist.

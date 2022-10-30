@@ -23,7 +23,7 @@ impl Server {
     pub fn new(handlers: Box<dyn RequestHandler>) -> Self {
         let connection_processor = ConnectionProcessor::new(handlers);
 
-        let server_configuration = crate::config::get_configuration().server_configuration();
+        let server_configuration = crate::config::instance().server_configuration();
 
         Self {
             socket_server: match server_configuration.server_type() {

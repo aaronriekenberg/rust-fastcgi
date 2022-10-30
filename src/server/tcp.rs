@@ -28,7 +28,7 @@ impl TcpServer {
     }
 
     async fn create_listener(&self) -> anyhow::Result<TcpListener> {
-        let server_configuration = crate::config::get_configuration().server_configuration();
+        let server_configuration = crate::config::instance().server_configuration();
         let bind_address = server_configuration.bind_address();
 
         let listener = TcpListener::bind(bind_address)

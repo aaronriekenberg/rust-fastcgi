@@ -165,7 +165,7 @@ impl RequestHandler for RunCommandHandler {
 }
 
 pub fn create_routes() -> anyhow::Result<Vec<PathSuffixAndHandler>> {
-    let command_configuration = crate::config::get_configuration().command_configuration();
+    let command_configuration = crate::config::instance().command_configuration();
 
     let mut routes: Vec<PathSuffixAndHandler> =
         Vec::with_capacity(1 + command_configuration.commands().len());

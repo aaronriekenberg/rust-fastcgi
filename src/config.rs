@@ -88,6 +88,6 @@ pub async fn read_configuration(config_file: String) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn get_configuration() -> &'static Configuration {
+pub fn instance() -> &'static Configuration {
     CONFIGURATION_INSTANCE.get().unwrap()
 }
