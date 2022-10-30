@@ -13,18 +13,11 @@ use crate::{
 
 pub struct ConnectionProcessor {
     handlers: Box<dyn RequestHandler>,
-    fastcgi_connection_configuration: crate::config::FastCGIConnectionConfiguration,
 }
 
 impl ConnectionProcessor {
-    pub fn new(
-        handlers: Box<dyn RequestHandler>,
-        fastcgi_connection_configuration: &crate::config::FastCGIConnectionConfiguration,
-    ) -> Arc<Self> {
-        Arc::new(Self {
-            handlers,
-            fastcgi_connection_configuration: fastcgi_connection_configuration.clone(),
-        })
+    pub fn new(handlers: Box<dyn RequestHandler>) -> Arc<Self> {
+        Arc::new(Self { handlers })
     }
 
     async fn process_one_request(
@@ -58,16 +51,16 @@ impl ConnectionProcessor {
         // If the socket connection was established successfully spawn a new task to handle
         // the requests that the webserver will send us.
         tokio::spawn(async move {
+            let fastcgi_connection_configuration = crate::config::get_configuration()
+                .server_configuration()
+                .fastcgi_connection_configuration();
+
             // Create a new requests handler it will collect the requests from the server and
             // supply a streaming interface.
             let mut requests = Requests::from_split_socket(
                 split_socket,
-                *self
-                    .fastcgi_connection_configuration
-                    .max_concurrent_connections(),
-                *self
-                    .fastcgi_connection_configuration
-                    .max_requests_per_connection(),
+                *fastcgi_connection_configuration.max_concurrent_connections(),
+                *fastcgi_connection_configuration.max_requests_per_connection(),
             );
 
             // Loop over the requests via the next method and process them.

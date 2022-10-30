@@ -91,13 +91,13 @@ struct RunCommandResponse<'a> {
 
 struct RunCommandHandler {
     run_command_semaphore: Arc<RunCommandSemapore>,
-    command_info: crate::config::CommandInfo,
+    command_info: &'static crate::config::CommandInfo,
 }
 
 impl RunCommandHandler {
     fn new(
         run_command_semaphore: Arc<RunCommandSemapore>,
-        command_info: crate::config::CommandInfo,
+        command_info: &'static crate::config::CommandInfo,
     ) -> Self {
         Self {
             run_command_semaphore,
@@ -164,9 +164,9 @@ impl RequestHandler for RunCommandHandler {
     }
 }
 
-pub fn create_routes(
-    command_configuration: &crate::config::CommandConfiguration,
-) -> anyhow::Result<Vec<PathSuffixAndHandler>> {
+pub fn create_routes() -> anyhow::Result<Vec<PathSuffixAndHandler>> {
+    let command_configuration = crate::config::get_configuration().command_configuration();
+
     let mut routes: Vec<PathSuffixAndHandler> =
         Vec::with_capacity(1 + command_configuration.commands().len());
 
@@ -184,7 +184,7 @@ pub fn create_routes(
             path_suffix,
             Box::new(RunCommandHandler::new(
                 Arc::clone(&run_command_semaphore),
-                command_info.clone(),
+                command_info,
             )),
         ));
     }

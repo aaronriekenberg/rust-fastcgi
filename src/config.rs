@@ -6,9 +6,9 @@ use log::info;
 
 use serde::{Deserialize, Serialize};
 
-use tokio::{fs::File, io::AsyncReadExt};
+use tokio::{fs::File, io::AsyncReadExt, sync::OnceCell};
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct ContextConfiguration {
     context: String,
@@ -20,14 +20,14 @@ pub enum ServerType {
     UNIX,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct FastCGIConnectionConfiguration {
     max_concurrent_connections: u8,
     max_requests_per_connection: u8,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct ServerConfiguration {
     server_type: ServerType,
@@ -35,7 +35,7 @@ pub struct ServerConfiguration {
     fastcgi_connection_configuration: FastCGIConnectionConfiguration,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct CommandInfo {
     id: String,
@@ -45,7 +45,7 @@ pub struct CommandInfo {
     args: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct CommandConfiguration {
     max_concurrent_commands: usize,
@@ -53,7 +53,7 @@ pub struct CommandConfiguration {
     commands: Vec<CommandInfo>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Deserialize, Serialize, Getters)]
 #[getset(get = "pub")]
 pub struct Configuration {
     context_configuration: ContextConfiguration,
@@ -61,7 +61,9 @@ pub struct Configuration {
     command_configuration: CommandConfiguration,
 }
 
-pub async fn read_configuration(config_file: String) -> anyhow::Result<Configuration> {
+static CONFIGURATION_INSTANCE: OnceCell<Configuration> = OnceCell::const_new();
+
+pub async fn read_configuration(config_file: String) -> anyhow::Result<()> {
     info!("reading '{}'", config_file);
 
     let mut file = File::open(&config_file)
@@ -79,5 +81,13 @@ pub async fn read_configuration(config_file: String) -> anyhow::Result<Configura
 
     info!("configuration\n{:#?}", configuration);
 
-    Ok(configuration)
+    CONFIGURATION_INSTANCE
+        .set(configuration)
+        .context("CONFIGURATION_INSTANCE.set error")?;
+
+    Ok(())
+}
+
+pub fn get_configuration() -> &'static Configuration {
+    CONFIGURATION_INSTANCE.get().unwrap()
 }

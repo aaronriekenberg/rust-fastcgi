@@ -15,25 +15,21 @@ use crate::{
 };
 
 pub struct TcpServer {
-    server_configuration: crate::config::ServerConfiguration,
     connection_processor: Arc<ConnectionProcessor>,
     connection_id_factory: FastCGIConnectionIDFactory,
 }
 
 impl TcpServer {
-    pub fn new(
-        server_configuration: &crate::config::ServerConfiguration,
-        connection_processor: Arc<ConnectionProcessor>,
-    ) -> Self {
+    pub fn new(connection_processor: Arc<ConnectionProcessor>) -> Self {
         Self {
-            server_configuration: server_configuration.clone(),
             connection_processor,
             connection_id_factory: FastCGIConnectionIDFactory::new(ServerType::TCP),
         }
     }
 
     async fn create_listener(&self) -> anyhow::Result<TcpListener> {
-        let bind_address = self.server_configuration.bind_address();
+        let server_configuration = crate::config::get_configuration().server_configuration();
+        let bind_address = server_configuration.bind_address();
 
         let listener = TcpListener::bind(bind_address)
             .await

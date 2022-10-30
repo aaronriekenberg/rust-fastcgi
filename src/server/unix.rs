@@ -17,25 +17,21 @@ use crate::{
 };
 
 pub struct UnixServer {
-    server_configuration: crate::config::ServerConfiguration,
     connection_processor: Arc<ConnectionProcessor>,
     connection_id_factory: FastCGIConnectionIDFactory,
 }
 
 impl UnixServer {
-    pub fn new(
-        server_configuration: &crate::config::ServerConfiguration,
-        connection_processor: Arc<ConnectionProcessor>,
-    ) -> Self {
+    pub fn new(connection_processor: Arc<ConnectionProcessor>) -> Self {
         Self {
-            server_configuration: server_configuration.clone(),
             connection_processor,
             connection_id_factory: FastCGIConnectionIDFactory::new(ServerType::UNIX),
         }
     }
 
     async fn create_listener(&self) -> anyhow::Result<UnixListener> {
-        let bind_address = self.server_configuration.bind_address();
+        let server_configuration = crate::config::get_configuration().server_configuration();
+        let bind_address = server_configuration.bind_address();
 
         // do not fail on remove error, the path may not exist.
         let remove_result = tokio::fs::remove_file(bind_address).await;

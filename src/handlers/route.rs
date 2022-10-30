@@ -15,13 +15,12 @@ pub struct Router {
 }
 
 impl Router {
-    pub fn new(
-        context_configuration: &crate::config::ContextConfiguration,
-        routes: Vec<PathSuffixAndHandler>,
-    ) -> anyhow::Result<Self> {
+    pub fn new(routes: Vec<PathSuffixAndHandler>) -> anyhow::Result<Self> {
         let mut router = Self {
             uri_to_request_handler: HashMap::with_capacity(routes.len()),
         };
+
+        let context_configuration = crate::config::get_configuration().context_configuration();
 
         for (path_suffix, handler) in routes {
             let uri_pathbuf = PathBuf::from(context_configuration.context()).join(path_suffix);

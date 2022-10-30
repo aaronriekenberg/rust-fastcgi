@@ -20,23 +20,15 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(
-        handlers: Box<dyn RequestHandler>,
-        server_configuration: &crate::config::ServerConfiguration,
-    ) -> Self {
-        let connection_processor = ConnectionProcessor::new(
-            handlers,
-            server_configuration.fastcgi_connection_configuration(),
-        );
+    pub fn new(handlers: Box<dyn RequestHandler>) -> Self {
+        let connection_processor = ConnectionProcessor::new(handlers);
+
+        let server_configuration = crate::config::get_configuration().server_configuration();
 
         Self {
             socket_server: match server_configuration.server_type() {
-                ServerType::TCP => {
-                    Box::new(TcpServer::new(server_configuration, connection_processor))
-                }
-                ServerType::UNIX => {
-                    Box::new(UnixServer::new(server_configuration, connection_processor))
-                }
+                ServerType::TCP => Box::new(TcpServer::new(connection_processor)),
+                ServerType::UNIX => Box::new(UnixServer::new(connection_processor)),
             },
         }
     }
