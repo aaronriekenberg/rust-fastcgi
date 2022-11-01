@@ -31,6 +31,7 @@ RUST_LOG=debug ./target/debug/rust-fastcgi ./config/unix.json
 
 * [tokio](https://tokio.rs/) asynchronous runtime for rust.  From tokio this app uses:
   * `async` / `await` functions (aka coroutines)
+  * Singleton configuration instance using [`tokio::sync::OnceCell`](https://docs.rs/tokio/latest/tokio/sync/struct.OnceCell.html).
   * TCP and UNIX server sockets
   * Asynchronous command execution using [`tokio::process::Command`](https://docs.rs/tokio/latest/tokio/process/struct.Command.html)
   * Timeouts
