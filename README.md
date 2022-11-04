@@ -54,3 +54,6 @@ RUST_LOG=debug ./target/debug/rust-fastcgi ./config/unix.json
 * Use of generics in server code to allow common connection and request processing code while supporting both tcp and unix server socket types.
 * Use of `'static` lifetime in `server::ConnectionProcessor::handle_connection` to allow for owned but non-global types.  [This reference](https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md#2-if-t-static-then-t-must-be-valid-for-the-entire-program) was very enlightning.
 * `handlers::command::RunCommandResponse` contains perhaps the first 128-bit variable I have ever used :)
+* Using `tokio::sync::OnceCell` in config to hold static singleton `config::Configuration` instance.  This means:
+  * Can return a `&'static Configuration` instance from `config::instance()` and save references where needed.
+  * No need for (most) config types to derive `Clone` unlike [previous efforts](https://github.com/aaronriekenberg/rust-doh-proxy/blob/master/src/doh/config.rs).
