@@ -12,12 +12,19 @@ mod response;
 mod server;
 mod utils;
 
+fn app_name() -> String {
+    std::env::args().nth(0).unwrap_or("[UNKNOWN]".to_owned())
+}
+
 async fn try_main() -> anyhow::Result<()> {
     env_logger::builder().format_timestamp_nanos().init();
 
-    let config_file = std::env::args()
-        .nth(1)
-        .context("config file required as command line argument")?;
+    let config_file = std::env::args().nth(1).with_context(|| {
+        format!(
+            "config file required as command line argument: {} <config file>",
+            app_name(),
+        )
+    })?;
 
     crate::config::read_configuration(config_file)
         .await
