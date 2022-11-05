@@ -12,7 +12,7 @@
     },
     "command_configuration": {
         "max_concurrent_commands": 10,
-        "semaphore_acquire_timeout_millis": 200,
+        "semaphore_acquire_timeout": "200ms",
         "commands": [
             {
                 "id": "df",

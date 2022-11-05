@@ -66,9 +66,7 @@ impl RunCommandSemapore {
     fn new(command_configuration: &crate::config::CommandConfiguration) -> Arc<Self> {
         Arc::new(Self {
             semapore: Semaphore::new(*command_configuration.max_concurrent_commands()),
-            acquire_timeout: Duration::from_millis(
-                *command_configuration.semaphore_acquire_timeout_millis(),
-            ),
+            acquire_timeout: *command_configuration.semaphore_acquire_timeout(),
         })
     }
 
