@@ -36,7 +36,7 @@ async fn try_main() -> anyhow::Result<()> {
 
     server.run().await.context("server.run error")?;
 
-    Ok(())
+    anyhow::bail!("sever.run returned");
 }
 
 #[tokio::main]
