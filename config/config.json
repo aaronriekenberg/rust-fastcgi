@@ -23,6 +23,15 @@
                 ]
             },
             {
+                "id": "git_log",
+                "description": "git log -1",
+                "command": "/usr/bin/git",
+                "args": [
+                    "log",
+                    "-1"
+                ]
+            },
+            {
                 "id": "ip_addr",
                 "description": "ip addr",
                 "command": "/usr/sbin/ip",
