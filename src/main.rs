@@ -26,10 +26,7 @@ async fn run_server(server: server::Server) -> anyhow::Result<()> {
         signal(SignalKind::terminate()).context("signal(terminate) error")?;
 
     tokio::select! {
-        result = server.run() => {
-            error!("server.run returned");
-            result.context("server.run error")?;
-        },
+        result = server.run() => result.context("server.run error")?,
         _ = interrupt_signal.recv() => info!("got SIGINT"),
         _ = terminate_signal.recv() => info!("got SIGTERM"),
     };
