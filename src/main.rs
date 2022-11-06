@@ -2,7 +2,9 @@
 
 use anyhow::Context;
 
-use log::error;
+use log::{error, info};
+
+use tokio::signal::unix::{signal, SignalKind};
 
 mod config;
 mod connection;
@@ -14,6 +16,25 @@ mod utils;
 
 fn app_name() -> String {
     std::env::args().nth(0).unwrap_or("[UNKNOWN]".to_owned())
+}
+
+async fn run_server(server: server::Server) -> anyhow::Result<()> {
+    let mut interrupt_signal =
+        signal(SignalKind::interrupt()).context("signal(interrupt) error")?;
+
+    let mut terminate_signal =
+        signal(SignalKind::terminate()).context("signal(terminate) error")?;
+
+    tokio::select! {
+        result = server.run() => {
+            error!("server.run returned");
+            result.context("server.run error")?;
+        },
+        _ = interrupt_signal.recv() => info!("got SIGINT"),
+        _ = terminate_signal.recv() => info!("got SIGTERM"),
+    };
+
+    Ok(())
 }
 
 async fn try_main() -> anyhow::Result<()> {
@@ -34,9 +55,7 @@ async fn try_main() -> anyhow::Result<()> {
 
     let server = crate::server::Server::new(handlers);
 
-    server.run().await.context("server.run error")?;
-
-    anyhow::bail!("sever.run returned");
+    run_server(server).await
 }
 
 #[tokio::main]
